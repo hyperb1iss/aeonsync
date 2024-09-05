@@ -1,63 +1,126 @@
-"""Utility functions for AeonSync."""
+"""Utility functions and classes for AeonSync."""
 
 import re
 import subprocess
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, NamedTuple
 
 logger = logging.getLogger(__name__)
 
 
-def parse_remote(remote: str, port: Optional[int] = None) -> Dict[str, str]:
-    """Parse the remote string into its components."""
+class RemoteInfo(NamedTuple):
+    """Information about the remote connection."""
+
+    user: Optional[str]
+    host: str
+    path: str
+    port: Optional[int]
+
+
+def parse_remote(remote: str, port: Optional[int] = None) -> RemoteInfo:
+    """
+    Parse the remote string into its components.
+
+    Args:
+        remote (str): Remote string in the format [user@]host:path
+        port (Optional[int]): SSH port number
+
+    Returns:
+        RemoteInfo: Parsed remote information
+
+    Raises:
+        ValueError: If the remote string format is invalid
+    """
     logger.debug("Parsing remote string: %s, port: %s", remote, port)
     match = re.match(r"^(?:(?P<user>[^@]+)@)?(?P<host>[^:]+):(?P<path>.+)$", remote)
     if not match:
         logger.error("Invalid remote format: %s", remote)
         raise ValueError("Invalid remote format. Use [user@]host:path")
     parts = match.groupdict()
-    parts["port"] = str(port) if port else None
-    logger.debug("Parsed remote: %s", parts)
-    return parts
+    return RemoteInfo(
+        user=parts["user"], host=parts["host"], path=parts["path"], port=port
+    )
 
 
-def build_ssh_cmd(
-    ssh_key: Optional[str] = None, remote_port: Optional[int] = None
-) -> List[str]:
-    """Build the SSH command with optional key and port."""
-    logger.debug("Building SSH command with key: %s, port: %s", ssh_key, remote_port)
-    ssh_cmd = ["ssh"]
-    if ssh_key:
-        ssh_cmd.extend(["-i", ssh_key])
-    if remote_port:
-        ssh_cmd.extend(["-p", str(remote_port)])
-    logger.debug("Built SSH command: %s", ssh_cmd)
-    return ssh_cmd
+class RemoteExecutor:
+    """Handles remote command execution for non-rsync operations."""
 
+    def __init__(
+        self,
+        remote_info: RemoteInfo,
+        ssh_key: Optional[str] = None,
+        remote_port: Optional[int] = None,
+    ):
+        """
+        Initialize RemoteExecutor with remote connection details.
 
-def run_command(
-    cmd: List[str], capture_output: bool = True
-) -> subprocess.CompletedProcess:
-    """Run a shell command and handle its output."""
-    logger.debug("Running command: %s", " ".join(cmd))
-    result = subprocess.run(cmd, capture_output=capture_output, text=True, check=False)
-    if result.returncode != 0:
-        logger.error("Command failed with error: %s", result.stderr)
-        raise subprocess.CalledProcessError(
-            result.returncode, cmd, result.stdout, result.stderr
-        )
-    logger.debug("Command completed successfully")
-    return result
+        Args:
+            remote_info (RemoteInfo): Remote server information
+            ssh_key (Optional[str]): Path to SSH key file
+            remote_port (Optional[int]): SSH port number
+        """
+        self.remote_info = remote_info
+        self.ssh_key = ssh_key
+        self.remote_port = remote_port or remote_info.port
+
+    def run_command(self, command: str) -> subprocess.CompletedProcess:
+        """
+        Run a command on the remote host using SSH.
+
+        Args:
+            command (str): Command to execute on the remote host
+
+        Returns:
+            subprocess.CompletedProcess: Result of the command execution
+
+        Raises:
+            subprocess.CalledProcessError: If the command execution fails
+        """
+        ssh_cmd = self._build_ssh_cmd()
+        full_cmd = ssh_cmd + [
+            f"{self.remote_info.user}@{self.remote_info.host}",
+            command,
+        ]
+        logger.debug("Running command: %s", " ".join(full_cmd))
+        result = subprocess.run(full_cmd, capture_output=True, text=True, check=True)
+        logger.debug("Command completed successfully")
+        return result
+
+    def _build_ssh_cmd(self) -> List[str]:
+        """
+        Build the SSH command with optional key and port.
+
+        Returns:
+            List[str]: SSH command components
+        """
+        ssh_cmd = ["ssh"]
+        if self.ssh_key:
+            ssh_cmd.extend(["-i", self.ssh_key])
+        if self.remote_port:
+            ssh_cmd.extend(["-p", str(self.remote_port)])
+        return ssh_cmd
 
 
 def get_backup_stats(output: str) -> Dict[str, str]:
-    """Extract relevant statistics from rsync output."""
+    """
+    Extract relevant statistics from rsync output.
+
+    Args:
+        output (str): Output from rsync command
+
+    Returns:
+        Dict[str, str]: Extracted statistics
+    """
     logger.debug("Extracting backup stats from rsync output")
     stats = {}
+    summary_started = False
     for line in output.split("\n"):
-        if ":" in line:
-            key, value = line.split(":", 1)
-            key = key.strip().lower().replace(" ", "_")
-            stats[key] = value.strip()
+        if line.startswith("Number of files:"):
+            summary_started = True
+        if summary_started:
+            if ":" in line:
+                key, value = line.split(":", 1)
+                key = key.strip().lower().replace(" ", "_")
+                stats[key] = value.strip()
     logger.debug("Extracted backup stats: %s", stats)
     return stats

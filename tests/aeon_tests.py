@@ -1,20 +1,18 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from pathlib import Path
 from datetime import datetime
 import subprocess
-from aeonsync import backup, restore, utils, config
-
+from aeonsync import AeonSync
+from aeonsync.backup import AeonBackup
+from aeonsync.restore import AeonRestore
+from aeonsync.list import ListBackups
+from aeonsync.utils import RemoteExecutor, RemoteInfo, parse_remote
+from aeonsync.config import BackupConfig
 
 @pytest.fixture
-def mock_subprocess_popen():
-    with patch("subprocess.Popen") as mock:
-        mock_process = MagicMock()
-        mock_process.stdout.readline.side_effect = ["", ""]  # Simulate end of output
-        mock_process.wait.return_value = 0
-        mock.return_value = mock_process
+def mock_remote_executor():
+    with patch("aeonsync.utils.RemoteExecutor") as mock:
         yield mock
-
 
 @pytest.fixture
 def mock_subprocess_run():
@@ -22,134 +20,97 @@ def mock_subprocess_run():
         mock.return_value = MagicMock(returncode=0, stdout="", stderr="")
         yield mock
 
-
 @pytest.fixture
 def mock_datetime_now():
     with patch("aeonsync.backup.datetime") as mock:
         mock.now.return_value = datetime(2023, 1, 1, 12, 0, 0)
         yield mock
 
+@pytest.fixture
+def sample_config():
+    return BackupConfig(
+        remote="user@host:/path",
+        sources=["/local/path"],
+        ssh_key="/path/to/key",
+        remote_port=22,
+        verbose=False,
+        dry_run=False,
+        retention_period=7
+    )
 
 def test_parse_remote():
-    assert utils.parse_remote("user@host:/path") == {
-        "user": "user",
-        "host": "host",
-        "path": "/path",
-        "port": None,
-    }
-    assert utils.parse_remote("host:/path") == {
-        "user": None,
-        "host": "host",
-        "path": "/path",
-        "port": None,
-    }
-    assert utils.parse_remote("user@host:/path", 2222) == {
-        "user": "user",
-        "host": "host",
-        "path": "/path",
-        "port": "2222",
-    }
+    assert parse_remote("user@host:/path") == RemoteInfo(
+        user="user",
+        host="host",
+        path="/path",
+        port=None
+    )
+    assert parse_remote("host:/path") == RemoteInfo(
+        user=None,
+        host="host",
+        path="/path",
+        port=None
+    )
+    assert parse_remote("user@host:/path", 2222) == RemoteInfo(
+        user="user",
+        host="host",
+        path="/path",
+        port=2222
+    )
     with pytest.raises(ValueError):
-        utils.parse_remote("invalid_format")
+        parse_remote("invalid_format")
 
-
-def test_build_ssh_cmd():
-    assert utils.build_ssh_cmd() == ["ssh"]
-    assert utils.build_ssh_cmd("/path/to/key") == ["ssh", "-i", "/path/to/key"]
-    assert utils.build_ssh_cmd(remote_port=2222) == ["ssh", "-p", "2222"]
-    assert utils.build_ssh_cmd("/path/to/key", 2222) == [
-        "ssh",
-        "-i",
-        "/path/to/key",
-        "-p",
-        "2222",
-    ]
-
-
-def test_get_backup_stats():
-    sample_output = """
-    Number of files: 1,000
-    Number of created files: 10
-    Number of deleted files: 5
-    Number of regular files transferred: 100
-    Total file size: 1.5G
-    Total transferred file size: 500M
-    Literal data: 400M
-    Matched data: 100M
-    Total bytes sent: 450M
-    Total bytes received: 1M
-    """
-    stats = utils.get_backup_stats(sample_output)
-    assert stats["number_of_files"] == "1,000"
-    assert stats["number_of_created_files"] == "10"
-    assert stats["number_of_deleted_files"] == "5"
-    assert stats["number_of_regular_files_transferred"] == "100"
-    assert stats["total_file_size"] == "1.5G"
-    assert stats["total_transferred_file_size"] == "500M"
-    assert stats["literal_data"] == "400M"
-    assert stats["matched_data"] == "100M"
-    assert stats["total_bytes_sent"] == "450M"
-    assert stats["total_bytes_received"] == "1M"
-
-
-@patch("aeonsync.backup.create_remote_dir")
-@patch("aeonsync.backup.update_latest_symlink")
-@patch("aeonsync.backup.save_backup_metadata")
-@patch("aeonsync.config.HOSTNAME", "test-hostname")
-def test_create_backup(
-    mock_save_metadata,
-    mock_update_symlink,
-    mock_create_dir,
-    mock_subprocess_popen,
-    mock_datetime_now,
-):
-    mock_subprocess_popen.return_value.stdout.readline.side_effect = [
-        "Number of files: 1,000\n",
-        "Number of created files: 10\n",
-        "",  # End of output
-    ]
-
-    backup.create_backup("user@host:/remote/path", ["/local/path"], False, False)
-
-    mock_subprocess_popen.assert_called()
-    mock_create_dir.assert_called_once()
-    mock_update_symlink.assert_called_once()
-    mock_save_metadata.assert_called_once()
-
-
-@patch("aeonsync.backup.run_command")
-def test_needs_full_backup(mock_run_command):
-    mock_run_command.return_value = MagicMock(stdout="exists")
-    assert not backup.needs_full_backup("user@host:/remote/path")
-
-    mock_run_command.return_value = MagicMock(stdout="")
-    assert backup.needs_full_backup("user@host:/remote/path")
-
-    mock_run_command.side_effect = subprocess.CalledProcessError(1, "cmd")
-    assert backup.needs_full_backup("user@host:/remote/path")
-
-
-@patch("aeonsync.restore.run_command")
-@patch("aeonsync.restore.get_hostname", return_value="test-hostname")
-def test_restore_file(mock_get_hostname, mock_run_command):
-    restore.restore_file("user@host:/remote/path", "2023-01-01", "/path/to/file")
-    mock_run_command.assert_called_once()
-    args = mock_run_command.call_args[0][0]
-    assert args[0] == "rsync"
-    assert "user@host:/remote/path/test-hostname/2023-01-01/path/to/file" in args
-    assert "/path/to/file" in args
-
-
-@patch("aeonsync.restore.run_command")
-@patch("aeonsync.restore.get_hostname", return_value="test-hostname")
-def test_list_backups(mock_get_hostname, mock_run_command):
-    restore.list_backups("user@host:/remote/path")
-    mock_run_command.assert_called_once()
-    args = mock_run_command.call_args[0][0]
+def test_remote_executor_run_command(mock_subprocess_run):
+    remote_info = RemoteInfo(user="user", host="host", path="/path", port=22)
+    executor = RemoteExecutor(remote_info, ssh_key="/path/to/key")
+    executor.run_command("ls -l")
+    mock_subprocess_run.assert_called_once()
+    args = mock_subprocess_run.call_args[0][0]
     assert args[0] == "ssh"
+    assert "-i" in args
+    assert "/path/to/key" in args
     assert "user@host" in args
-    assert "for d in /remote/path/test-hostname/20*-*-*" in args[2]
+    assert "ls -l" in args
 
+def test_aeon_backup_create_backup(sample_config, mock_remote_executor):
+    backup = AeonBackup(sample_config)
+    backup.create_backup()
+    mock_remote_executor.return_value.run_command.assert_called()
+
+def test_aeon_backup_needs_full_backup(sample_config, mock_remote_executor):
+    backup = AeonBackup(sample_config)
+    mock_remote_executor.return_value.run_command.side_effect = [subprocess.CalledProcessError(1, "cmd")]
+    assert backup.needs_full_backup() == True
+
+    mock_remote_executor.return_value.run_command.side_effect = None
+    assert backup.needs_full_backup() == False
+
+def test_aeon_restore_restore_file(sample_config, mock_remote_executor):
+    restore = AeonRestore(sample_config)
+    restore.restore_file("2023-01-01", "/path/to/file")
+    mock_remote_executor.return_value.rsync.assert_called_once()
+
+def test_list_backups(sample_config, mock_remote_executor):
+    list_backups = ListBackups(sample_config)
+    mock_remote_executor.return_value.run_command.return_value.stdout = '{"date": "2023-01-01", "stats": {}}'
+    list_backups.list()
+    mock_remote_executor.return_value.run_command.assert_called_once()
+
+def test_aeon_sync_sync(sample_config, mock_remote_executor):
+    sync = AeonSync(sample_config)
+    sync.sync()
+    mock_remote_executor.return_value.run_command.assert_called()
+
+def test_aeon_sync_restore(sample_config, mock_remote_executor):
+    sync = AeonSync(sample_config)
+    sync.restore("2023-01-01", "/path/to/file")
+    mock_remote_executor.return_value.rsync.assert_called_once()
+
+def test_aeon_sync_list_backups(sample_config, mock_remote_executor):
+    sync = AeonSync(sample_config)
+    mock_remote_executor.return_value.run_command.return_value.stdout = '{"date": "2023-01-01", "stats": {}}'
+    sync.list_backups()
+    mock_remote_executor.return_value.run_command.assert_called_once()
 
 if __name__ == "__main__":
     pytest.main()

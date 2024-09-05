@@ -1,20 +1,19 @@
 """Command-line interface for AeonSync."""
 
-import typer
 import logging
 from pathlib import Path
 from typing import List, Optional
+
+import typer
 from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
 
 from aeonsync.config import (
     DEFAULT_REMOTE,
     DEFAULT_RETENTION_PERIOD,
     DEFAULT_SOURCE_DIRS,
+    BackupConfig,
 )
-from aeonsync.backup import create_backup, cleanup_old_backups, needs_full_backup
-from aeonsync.restore import restore_file, list_backups
+from aeonsync import AeonSync
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
@@ -35,10 +34,19 @@ port_option = typer.Option(None, help="Remote SSH port")
 verbose_option = typer.Option(False, help="Enable verbose output")
 
 
-def common_callback(ctx: typer.Context, verbose: bool = verbose_option):
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logger.debug("Verbose mode enabled")
+def get_backup_config(
+    ctx: typer.Context, sources: List[Path], retention: int, dry_run: bool
+) -> BackupConfig:
+    """Create a BackupConfig instance from the context and command options."""
+    return BackupConfig(
+        remote=ctx.obj["remote"],
+        sources=sources,
+        ssh_key=ctx.obj["ssh_key"],
+        remote_port=ctx.obj["port"],
+        verbose=ctx.obj["verbose"],
+        dry_run=dry_run,
+        retention_period=retention,
+    )
 
 
 @app.callback()
@@ -55,14 +63,17 @@ def callback(
     ctx.obj["ssh_key"] = ssh_key
     ctx.obj["port"] = port
     ctx.obj["verbose"] = verbose
-    common_callback(ctx, verbose)
+
+    if verbose:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("Verbose mode enabled")
 
 
 @app.command()
 def sync(
     ctx: typer.Context,
-    sources: List[str] = typer.Option(
-        DEFAULT_SOURCE_DIRS, help="Source directories to backup"
+    sources: List[Path] = typer.Option(
+        [Path(s) for s in DEFAULT_SOURCE_DIRS], help="Source directories to backup"
     ),
     retention: int = typer.Option(
         DEFAULT_RETENTION_PERIOD, help="Number of days to retain backups"
@@ -73,41 +84,13 @@ def sync(
 ):
     """Create a backup of specified sources to the remote destination."""
     try:
-        full_backup = needs_full_backup(
-            ctx.obj["remote"], ctx.obj["ssh_key"], ctx.obj["port"]
-        )
-        backup_type = "Full" if full_backup else "Incremental"
-
-        with console.status(f"[bold green]Performing {backup_type.lower()} backup..."):
-            create_backup(
-                ctx.obj["remote"],
-                sources,
-                full_backup,
-                dry_run,
-                ctx.obj["ssh_key"],
-                ctx.obj["port"],
-                ctx.obj["verbose"],
-            )
-
-            if not dry_run:
-                cleanup_old_backups(
-                    ctx.obj["remote"], retention, ctx.obj["ssh_key"], ctx.obj["port"]
-                )
-
-        console.print(f"[bold green]{backup_type} backup completed successfully.")
+        config = get_backup_config(ctx, sources, retention, dry_run)
+        aeonsync = AeonSync(config)
+        with console.status("[bold green]Performing backup..."):
+            aeonsync.sync()
+        console.print("[bold green]Backup completed successfully.")
     except Exception as e:
         logger.error("Backup failed: %s", str(e), exc_info=True)
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
-        raise typer.Exit(code=1)
-
-
-@app.command()
-def list(ctx: typer.Context):
-    """List all available backups with their metadata."""
-    try:
-        list_backups(ctx.obj["remote"], ctx.obj["ssh_key"], ctx.obj["port"])
-    except Exception as e:
-        logger.error("Failed to list backups: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 
@@ -120,13 +103,26 @@ def restore(
 ):
     """Restore a specific file from a backup."""
     try:
+        config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
+        aeonsync = AeonSync(config)
         with console.status(f"[bold green]Restoring file {file} from {date}..."):
-            restore_file(
-                ctx.obj["remote"], date, str(file), ctx.obj["ssh_key"], ctx.obj["port"]
-            )
+            aeonsync.restore(date, str(file))
         console.print(f"[bold green]File {file} restored successfully from {date}.")
     except Exception as e:
         logger.error("File restoration failed: %s", str(e), exc_info=True)
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def list_backups(ctx: typer.Context):
+    """List all available backups with their metadata."""
+    try:
+        config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
+        aeonsync = AeonSync(config)
+        aeonsync.list_backups()
+    except Exception as e:
+        logger.error("Failed to list backups: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 

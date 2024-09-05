@@ -2,208 +2,165 @@
 
 import json
 import logging
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional, Union, Dict
 import subprocess
+from datetime import datetime
+from typing import List, Any, Dict
+from pathlib import Path, PosixPath
 
-from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS
-from aeonsync.utils import parse_remote, build_ssh_cmd, run_command, get_backup_stats
+from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS, BackupConfig
+from aeonsync.utils import RemoteExecutor, RemoteInfo, parse_remote, get_backup_stats
 
 logger = logging.getLogger(__name__)
 
 
-def create_backup(
-    remote: str,
-    sources: List[Union[str, Path]],
-    full: bool = False,
-    dry_run: bool = False,
-    ssh_key: Optional[str] = None,
-    remote_port: Optional[int] = None,
-    verbose: bool = False,
-) -> None:
-    """Create a full or incremental backup."""
-    logger.info("Creating %s backup", "full" if full else "incremental")
-    remote_info = parse_remote(remote, remote_port)
-    date = datetime.now().strftime("%Y-%m-%d")
-    backup_path = f"{remote_info['path']}/{HOSTNAME}/{date}"
-    latest_link = f"{remote_info['path']}/{HOSTNAME}/latest"
-    rsync_url = f"{remote_info['user']}@{remote_info['host']}:{backup_path}"
+class AeonBackup:
+    """Handles backup operations for AeonSync."""
 
-    logger.debug("Backup path: %s", backup_path)
-    logger.debug("Latest link: %s", latest_link)
-    logger.debug("Rsync URL: %s", rsync_url)
+    def __init__(self, config: BackupConfig):
+        """
+        Initialize AeonBackup with the provided configuration.
 
-    create_remote_dir(remote, backup_path, ssh_key, remote_port)
+        Args:
+            config (BackupConfig): Backup configuration
+        """
+        self.config = config
+        self.remote_info: RemoteInfo = parse_remote(
+            self.config.remote, self.config.remote_port
+        )
+        self.executor = RemoteExecutor(
+            self.remote_info, self.config.ssh_key, self.config.remote_port
+        )
+        self.date = datetime.now().strftime("%Y-%m-%d")
+        self.backup_path = f"{self.remote_info.path}/{HOSTNAME}/{self.date}"
+        self.latest_link = f"{self.remote_info.path}/{HOSTNAME}/latest"
 
-    cmd = ["rsync", "-avz", "--delete", "--stats"]
-    for exclusion in EXCLUSIONS:
-        cmd.extend(["--exclude", exclusion])
-    if not full:
-        cmd.extend(["--link-dest", f"{remote}:{latest_link}"])
-    if dry_run:
-        cmd.append("--dry-run")
-    if verbose:
-        cmd.append("--progress")
+    def create_backup(self) -> None:
+        """Create a full or incremental backup."""
+        logger.info("Creating %s backup", "full" if self.config.full else "incremental")
 
-    if ssh_key or remote_port:
-        ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-        cmd.extend(["-e", " ".join(ssh_cmd)])
+        self._create_remote_dir()
+        rsync_output = self._perform_backup()
 
-    # Convert all sources to strings
-    str_sources = [str(s) for s in sources]
-    cmd.extend(str_sources + [rsync_url])
+        if not self.config.dry_run:
+            self._update_latest_symlink()
+            self._save_backup_metadata(rsync_output)
 
-    logger.debug("Rsync command: %s", " ".join(map(str, cmd)))
+        logger.info("Backup created successfully")
 
-    # Use Popen to capture output while still displaying it
-    process = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        universal_newlines=True,
-    )
+    def _create_remote_dir(self) -> None:
+        """Create the remote directory for the backup."""
+        logger.debug("Creating remote directory: %s", self.backup_path)
+        self.executor.run_command(f"mkdir -p {self.backup_path}")
 
-    output = []
-    for line in iter(process.stdout.readline, ""):
-        print(line, end="")  # Print the line in real-time
-        output.append(line)  # Store the line for later processing
+    def _perform_backup(self) -> str:
+        """Perform the actual backup using rsync."""
+        cmd = self._build_rsync_command()
+        logger.debug("Rsync command: %s", " ".join(cmd))
 
-    process.stdout.close()
-    return_code = process.wait()
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            logger.debug("Rsync output: %s", result.stdout)
 
-    if return_code != 0:
-        logger.error(f"Rsync command failed with return code {return_code}")
-        raise subprocess.CalledProcessError(return_code, cmd)
+            # Process and log the backup stats
+            stats = get_backup_stats(result.stdout)
+            for key, value in stats.items():
+                logger.info("%s: %s", key.replace("_", " ").title(), value)
 
-    # Join the output lines and process stats
-    full_output = "".join(output)
-    stats = get_backup_stats(full_output)
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            logger.error("Rsync command failed: %s", e.stderr)
+            raise
 
-    if not dry_run:
-        update_latest_symlink(remote, backup_path, latest_link, ssh_key, remote_port)
-        save_backup_metadata(
-            remote, backup_path, stats, str_sources, ssh_key, remote_port
+    def _build_rsync_command(self) -> List[str]:
+        """Build the rsync command for the backup operation."""
+        cmd = ["rsync", "-avz", "--delete", "--stats"]
+        for exclusion in EXCLUSIONS:
+            cmd.extend(["--exclude", exclusion])
+        if not self.config.full:
+            cmd.extend(["--link-dest", f"../{HOSTNAME}/latest"])
+        if self.config.dry_run:
+            cmd.append("--dry-run")
+        if self.config.verbose:
+            cmd.append("--progress")
+
+        # Add SSH options
+        ssh_opts = self._build_ssh_options()
+        cmd.extend(["-e", f"ssh {ssh_opts}"])
+
+        # Convert all sources to strings
+        str_sources = [str(s) for s in self.config.sources]
+
+        # Construct the remote path correctly
+        remote_path = f"{self.remote_info.user}@{self.remote_info.host}:{self.remote_info.path}/{HOSTNAME}/{self.date}"
+
+        cmd.extend(str_sources + [remote_path])
+
+        return cmd
+
+    def _build_ssh_options(self) -> str:
+        """Build SSH options string."""
+        opts = []
+        if self.config.ssh_key:
+            opts.append(f"-i {self.config.ssh_key}")
+        if self.config.remote_port:
+            opts.append(f"-p {self.config.remote_port}")
+        return " ".join(opts)
+
+    def _update_latest_symlink(self) -> None:
+        """Update the 'latest' symlink to point to the most recent backup."""
+        logger.debug("Updating latest symlink to: %s", self.backup_path)
+        self.executor.run_command(f"ln -snf {self.backup_path} {self.latest_link}")
+
+    def _save_backup_metadata(self, rsync_output: str) -> None:
+        """Save the backup metadata to a file in the backup directory."""
+        logger.debug("Saving backup metadata")
+        stats = get_backup_stats(rsync_output)
+        metadata = {
+            "start_time": datetime.now().isoformat(),
+            "end_time": datetime.now().isoformat(),
+            "hostname": HOSTNAME,
+            "sources": [str(s) for s in self.config.sources],
+            "config": self._serialize_config(self.config._asdict()),
+            "stats": stats,
+        }
+        self.executor.run_command(
+            f"echo '{json.dumps(metadata, indent=2)}' > {self.backup_path}/{METADATA_FILE_NAME}"
         )
 
-    logger.info("Backup created successfully")
+    @staticmethod
+    def _serialize_config(config: Any) -> Any:
+        """Recursively serialize config to ensure JSON compatibility."""
+        if isinstance(config, (Path, PosixPath)):
+            return str(config)
+        elif isinstance(config, dict):
+            return {k: AeonBackup._serialize_config(v) for k, v in config.items()}
+        elif isinstance(config, list):
+            return [AeonBackup._serialize_config(v) for v in config]
+        elif isinstance(config, tuple):
+            return tuple(AeonBackup._serialize_config(v) for v in config)
+        else:
+            return config
 
+    def cleanup_old_backups(self) -> None:
+        """Remove backups older than the specified retention period."""
+        logger.info(
+            "Cleaning up old backups (retention period: %d days)",
+            self.config.retention_period,
+        )
+        cmd = (
+            f"find {self.remote_info.path}/{HOSTNAME} -maxdepth 1 -type d "
+            f"-name '20*-*-*' -mtime +{self.config.retention_period} -exec rm -rf {{}} \\;"
+        )
+        self.executor.run_command(cmd)
+        logger.info("Old backups cleaned up successfully")
 
-def create_remote_dir(
-    remote: str,
-    path: str,
-    ssh_key: Optional[str] = None,
-    remote_port: Optional[int] = None,
-) -> None:
-    """Create a directory on the remote host."""
-    logger.debug("Creating remote directory: %s", path)
-    remote_info = parse_remote(remote, remote_port)
-    ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-    ssh_cmd.extend([f"{remote_info['user']}@{remote_info['host']}", f"mkdir -p {path}"])
-    run_command(ssh_cmd)
-    logger.debug("Remote directory created successfully")
-
-
-def update_latest_symlink(
-    remote: str,
-    backup_path: str,
-    latest_link: str,
-    ssh_key: Optional[str] = None,
-    remote_port: Optional[int] = None,
-) -> None:
-    """Update the 'latest' symlink to point to the most recent backup."""
-    logger.debug("Updating latest symlink to: %s", backup_path)
-    remote_info = parse_remote(remote, remote_port)
-    ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-    ssh_cmd.extend(
-        [
-            f"{remote_info['user']}@{remote_info['host']}",
-            f"ln -snf {backup_path} {latest_link}",
-        ]
-    )
-    run_command(ssh_cmd)
-    logger.debug("Latest symlink updated successfully")
-
-
-def save_backup_metadata(
-    remote: str,
-    backup_path: str,
-    stats: Dict[str, str],
-    sources: List[str],
-    ssh_key: Optional[str] = None,
-    remote_port: Optional[int] = None,
-) -> None:
-    """Save the backup metadata to a file in the backup directory."""
-    logger.debug("Saving backup metadata")
-    metadata = {
-        "start_time": datetime.now().isoformat(),
-        "end_time": datetime.now().isoformat(),
-        "hostname": HOSTNAME,
-        "sources": sources,
-        "stats": stats,
-    }
-    metadata_json = json.dumps(metadata, indent=2)
-    remote_info = parse_remote(remote, remote_port)
-    ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-
-    # Escape single quotes in the JSON string
-    escaped_json = metadata_json.replace("'", "'\\''")
-
-    cmd = ssh_cmd + [
-        f"{remote_info['user']}@{remote_info['host']}",
-        f"echo '{escaped_json}' > {backup_path}/{METADATA_FILE_NAME}",
-    ]
-
-    logger.debug(f"Metadata command: {' '.join(cmd)}")
-    try:
-        run_command(cmd)
-        logger.debug("Backup metadata saved successfully")
-    except Exception as e:
-        logger.error(f"Failed to save backup metadata: {str(e)}")
-
-
-def cleanup_old_backups(
-    remote: str,
-    retention_period: int,
-    ssh_key: Optional[str] = None,
-    remote_port: Optional[int] = None,
-) -> None:
-    """Remove backups older than the specified retention period."""
-    logger.info("Cleaning up old backups (retention period: %d days)", retention_period)
-    remote_info = parse_remote(remote, remote_port)
-    ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-    ssh_cmd.extend(
-        [
-            f"{remote_info['user']}@{remote_info['host']}",
-            f"find {remote_info['path']}/{HOSTNAME} -maxdepth 1 -type d -name '20*-*-*' -mtime +{retention_period} -exec rm -rf {{}} \\;",
-        ]
-    )
-    run_command(ssh_cmd)
-    logger.info("Old backups cleaned up successfully")
-
-
-def needs_full_backup(
-    remote: str, ssh_key: Optional[str] = None, remote_port: Optional[int] = None
-) -> bool:
-    """Determine if a full backup is needed."""
-    logger.debug("Checking if full backup is needed")
-    remote_info = parse_remote(remote, remote_port)
-    latest_link = f"{remote_info['path']}/{HOSTNAME}/latest"
-    ssh_cmd = build_ssh_cmd(ssh_key, remote_port)
-    ssh_cmd.extend(
-        [
-            f"{remote_info['user']}@{remote_info['host']}",
-            f"test -e {latest_link} && echo exists",
-        ]
-    )
-
-    try:
-        result = run_command(ssh_cmd)
-        needs_full = "exists" not in result.stdout
-        logger.info("Full backup needed: %s", needs_full)
-        return needs_full
-    except subprocess.CalledProcessError:
-        logger.info("Full backup needed: True (error checking latest link)")
-        return True
+    def needs_full_backup(self) -> bool:
+        """Determine if a full backup is needed."""
+        logger.debug("Checking if full backup is needed")
+        try:
+            self.executor.run_command(f"test -e {self.latest_link}")
+            logger.info("Incremental backup possible")
+            return False
+        except Exception:
+            logger.info("Full backup needed")
+            return True
