@@ -55,25 +55,9 @@ def get_backup_stats(output: str) -> Dict[str, str]:
     logger.debug("Extracting backup stats from rsync output")
     stats = {}
     for line in output.split("\n"):
-        if line.startswith("Number of files:"):
-            stats["total_files"] = line.split(":")[1].strip()
-        elif line.startswith("Number of created files:"):
-            stats["created_files"] = line.split(":")[1].strip()
-        elif line.startswith("Number of deleted files:"):
-            stats["deleted_files"] = line.split(":")[1].strip()
-        elif line.startswith("Number of regular files transferred:"):
-            stats["files_transferred"] = line.split(":")[1].strip()
-        elif line.startswith("Total file size:"):
-            stats["total_file_size"] = line.split(":")[1].strip()
-        elif line.startswith("Total transferred file size:"):
-            stats["transferred_size"] = line.split(":")[1].strip()
-        elif line.startswith("Literal data:"):
-            stats["literal_data"] = line.split(":")[1].strip()
-        elif line.startswith("Matched data:"):
-            stats["matched_data"] = line.split(":")[1].strip()
-        elif line.startswith("Total bytes sent:"):
-            stats["bytes_sent"] = line.split(":")[1].strip()
-        elif line.startswith("Total bytes received:"):
-            stats["bytes_received"] = line.split(":")[1].strip()
+        if ":" in line:
+            key, value = line.split(":", 1)
+            key = key.strip().lower().replace(" ", "_")
+            stats[key] = value.strip()
     logger.debug("Extracted backup stats: %s", stats)
     return stats

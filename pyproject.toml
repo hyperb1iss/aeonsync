@@ -19,3 +19,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 aeon = "aeonsync.cli:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
