@@ -4,6 +4,9 @@ import typer
 import logging
 from pathlib import Path
 from typing import List, Optional
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from aeonsync.config import (
     DEFAULT_REMOTE,
@@ -14,13 +17,14 @@ from aeonsync.backup import create_backup, cleanup_old_backups, needs_full_backu
 from aeonsync.restore import restore_file, list_backups
 
 # Set up logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Create a Typer app instance
 app = typer.Typer()
+
+# Create a Rich console instance
+console = Console()
 
 # Common options
 remote_option = typer.Option(
@@ -69,44 +73,31 @@ def sync(
 ):
     """Create a backup of specified sources to the remote destination."""
     try:
-        logger.info("Starting backup process")
-        logger.debug(
-            "Sync parameters: sources=%s, remote=%s, retention=%d, ssh_key=%s, port=%s, dry_run=%s, verbose=%s",
-            sources,
-            ctx.obj["remote"],
-            retention,
-            ctx.obj["ssh_key"],
-            ctx.obj["port"],
-            dry_run,
-            ctx.obj["verbose"],
-        )
-
         full_backup = needs_full_backup(
             ctx.obj["remote"], ctx.obj["ssh_key"], ctx.obj["port"]
         )
-        logger.info("Performing %s backup", "full" if full_backup else "incremental")
+        backup_type = "Full" if full_backup else "Incremental"
 
-        create_backup(
-            ctx.obj["remote"],
-            sources,
-            full_backup,
-            dry_run,
-            ctx.obj["ssh_key"],
-            ctx.obj["port"],
-            ctx.obj["verbose"],
-        )
-
-        if not dry_run:
-            logger.info("Cleaning up old backups")
-            cleanup_old_backups(
-                ctx.obj["remote"], retention, ctx.obj["ssh_key"], ctx.obj["port"]
+        with console.status(f"[bold green]Performing {backup_type.lower()} backup..."):
+            create_backup(
+                ctx.obj["remote"],
+                sources,
+                full_backup,
+                dry_run,
+                ctx.obj["ssh_key"],
+                ctx.obj["port"],
+                ctx.obj["verbose"],
             )
 
-        logger.info("AeonSync completed successfully")
-        typer.echo("AeonSync completed successfully.")
+            if not dry_run:
+                cleanup_old_backups(
+                    ctx.obj["remote"], retention, ctx.obj["ssh_key"], ctx.obj["port"]
+                )
+
+        console.print(f"[bold green]{backup_type} backup completed successfully.")
     except Exception as e:
-        logger.error("Error during backup process: %s", str(e), exc_info=True)
-        typer.echo(f"Error: {str(e)}", err=True)
+        logger.error("Backup failed: %s", str(e), exc_info=True)
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -114,17 +105,10 @@ def sync(
 def list(ctx: typer.Context):
     """List all available backups with their metadata."""
     try:
-        logger.info("Listing available backups")
-        logger.debug(
-            "List parameters: remote=%s, ssh_key=%s, port=%s",
-            ctx.obj["remote"],
-            ctx.obj["ssh_key"],
-            ctx.obj["port"],
-        )
         list_backups(ctx.obj["remote"], ctx.obj["ssh_key"], ctx.obj["port"])
     except Exception as e:
-        logger.error("Error while listing backups: %s", str(e), exc_info=True)
-        typer.echo(f"Error: {str(e)}", err=True)
+        logger.error("Failed to list backups: %s", str(e), exc_info=True)
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 
 
@@ -136,22 +120,14 @@ def restore(
 ):
     """Restore a specific file from a backup."""
     try:
-        logger.info("Starting file restoration")
-        logger.debug(
-            "Restore parameters: file=%s, date=%s, remote=%s, ssh_key=%s, port=%s",
-            file,
-            date,
-            ctx.obj["remote"],
-            ctx.obj["ssh_key"],
-            ctx.obj["port"],
-        )
-        restore_file(
-            ctx.obj["remote"], date, str(file), ctx.obj["ssh_key"], ctx.obj["port"]
-        )
-        logger.info("File restoration completed successfully")
+        with console.status(f"[bold green]Restoring file {file} from {date}..."):
+            restore_file(
+                ctx.obj["remote"], date, str(file), ctx.obj["ssh_key"], ctx.obj["port"]
+            )
+        console.print(f"[bold green]File {file} restored successfully from {date}.")
     except Exception as e:
-        logger.error("Error during file restoration: %s", str(e), exc_info=True)
-        typer.echo(f"Error: {str(e)}", err=True)
+        logger.error("File restoration failed: %s", str(e), exc_info=True)
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 
 
