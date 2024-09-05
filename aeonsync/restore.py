@@ -1,6 +1,7 @@
 """Restore functionality for AeonSync."""
 
 import logging
+import subprocess
 
 from aeonsync.utils import RemoteExecutor, RemoteInfo, parse_remote
 from aeonsync.config import HOSTNAME, BackupConfig
@@ -42,5 +43,12 @@ class AeonRestore:
         logger.debug("Remote file path: %s", remote_file_path)
         logger.debug("Local file path: %s", file_path)
 
-        self.executor.rsync(remote_file_path, file_path, is_download=True)
-        logger.info("File restored successfully")
+        source = f"{self.remote_info.user}@{self.remote_info.host}:{remote_file_path}"
+        destination = file_path
+
+        try:
+            self.executor.rsync(source, destination)
+            logger.info("File restored successfully")
+        except subprocess.CalledProcessError as e:
+            logger.error("Failed to restore file: %s", e)
+            raise

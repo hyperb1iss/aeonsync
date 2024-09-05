@@ -2,9 +2,9 @@
 
 import json
 import logging
-import subprocess
 from datetime import datetime
-from typing import List, Any, Dict
+import subprocess
+from typing import List, Any
 from pathlib import Path, PosixPath
 
 from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS, BackupConfig
@@ -54,11 +54,14 @@ class AeonBackup:
 
     def _perform_backup(self) -> str:
         """Perform the actual backup using rsync."""
-        cmd = self._build_rsync_command()
-        logger.debug("Rsync command: %s", " ".join(cmd))
+        extra_args = self._build_rsync_extra_args()
+        source = str(self.config.sources[0])  # Assuming single source for simplicity
+        destination = (
+            f"{self.remote_info.user}@{self.remote_info.host}:{self.backup_path}"
+        )
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            result = self.executor.rsync(source, destination, extra_args)
             logger.debug("Rsync output: %s", result.stdout)
 
             # Process and log the backup stats
@@ -71,40 +74,18 @@ class AeonBackup:
             logger.error("Rsync command failed: %s", e.stderr)
             raise
 
-    def _build_rsync_command(self) -> List[str]:
-        """Build the rsync command for the backup operation."""
-        cmd = ["rsync", "-avz", "--delete", "--stats"]
+    def _build_rsync_extra_args(self) -> List[str]:
+        """Build extra arguments for the rsync command."""
+        extra_args = ["--delete", "--stats"]
         for exclusion in EXCLUSIONS:
-            cmd.extend(["--exclude", exclusion])
+            extra_args.extend(["--exclude", exclusion])
         if not self.config.full:
-            cmd.extend(["--link-dest", f"../{HOSTNAME}/latest"])
+            extra_args.extend(["--link-dest", f"../{HOSTNAME}/latest"])
         if self.config.dry_run:
-            cmd.append("--dry-run")
+            extra_args.append("--dry-run")
         if self.config.verbose:
-            cmd.append("--progress")
-
-        # Add SSH options
-        ssh_opts = self._build_ssh_options()
-        cmd.extend(["-e", f"ssh {ssh_opts}"])
-
-        # Convert all sources to strings
-        str_sources = [str(s) for s in self.config.sources]
-
-        # Construct the remote path correctly
-        remote_path = f"{self.remote_info.user}@{self.remote_info.host}:{self.remote_info.path}/{HOSTNAME}/{self.date}"
-
-        cmd.extend(str_sources + [remote_path])
-
-        return cmd
-
-    def _build_ssh_options(self) -> str:
-        """Build SSH options string."""
-        opts = []
-        if self.config.ssh_key:
-            opts.append(f"-i {self.config.ssh_key}")
-        if self.config.remote_port:
-            opts.append(f"-p {self.config.remote_port}")
-        return " ".join(opts)
+            extra_args.append("--progress")
+        return extra_args
 
     def _update_latest_symlink(self) -> None:
         """Update the 'latest' symlink to point to the most recent backup."""
@@ -132,14 +113,14 @@ class AeonBackup:
         """Recursively serialize config to ensure JSON compatibility."""
         if isinstance(config, (Path, PosixPath)):
             return str(config)
-        elif isinstance(config, dict):
+        if isinstance(config, dict):
             return {k: AeonBackup._serialize_config(v) for k, v in config.items()}
-        elif isinstance(config, list):
+        if isinstance(config, list):
             return [AeonBackup._serialize_config(v) for v in config]
-        elif isinstance(config, tuple):
+        if isinstance(config, tuple):
             return tuple(AeonBackup._serialize_config(v) for v in config)
-        else:
-            return config
+
+        return config
 
     def cleanup_old_backups(self) -> None:
         """Remove backups older than the specified retention period."""
@@ -161,6 +142,6 @@ class AeonBackup:
             self.executor.run_command(f"test -e {self.latest_link}")
             logger.info("Incremental backup possible")
             return False
-        except Exception:
+        except subprocess.CalledProcessError:
             logger.info("Full backup needed")
             return True

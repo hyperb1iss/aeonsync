@@ -82,9 +82,36 @@ class RemoteExecutor:
             command,
         ]
         logger.debug("Running command: %s", " ".join(full_cmd))
-        result = subprocess.run(full_cmd, capture_output=True, text=True, check=True)
-        logger.debug("Command completed successfully")
-        return result
+        return subprocess.run(full_cmd, capture_output=True, text=True, check=True)
+
+    def rsync(
+        self, source: str, destination: str, extra_args: List[str] = None
+    ) -> subprocess.CompletedProcess:
+        """
+        Run rsync command to sync files between local and remote.
+
+        Args:
+            source (str): Source path (local or remote)
+            destination (str): Destination path (local or remote)
+            extra_args (List[str], optional): Additional rsync arguments
+
+        Returns:
+            subprocess.CompletedProcess: Result of the rsync execution
+
+        Raises:
+            subprocess.CalledProcessError: If the rsync execution fails
+        """
+        rsync_cmd = ["rsync", "-avz", "--delete"]
+        if extra_args:
+            rsync_cmd.extend(extra_args)
+
+        ssh_opts = self._build_ssh_options()
+        rsync_cmd.extend(["-e", f"ssh {ssh_opts}"])
+
+        rsync_cmd.extend([source, destination])
+
+        logger.debug("Running rsync command: %s", " ".join(rsync_cmd))
+        return subprocess.run(rsync_cmd, capture_output=True, text=True, check=True)
 
     def _build_ssh_cmd(self) -> List[str]:
         """
@@ -99,6 +126,20 @@ class RemoteExecutor:
         if self.remote_port:
             ssh_cmd.extend(["-p", str(self.remote_port)])
         return ssh_cmd
+
+    def _build_ssh_options(self) -> str:
+        """
+        Build SSH options string.
+
+        Returns:
+            str: SSH options string
+        """
+        opts = []
+        if self.ssh_key:
+            opts.append(f"-i {self.ssh_key}")
+        if self.remote_port:
+            opts.append(f"-p {self.remote_port}")
+        return " ".join(opts)
 
 
 def get_backup_stats(output: str) -> Dict[str, str]:
