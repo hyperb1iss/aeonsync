@@ -7,13 +7,14 @@ import subprocess
 from typing import List, Any
 from pathlib import Path, PosixPath
 
+from aeonsync import BaseCommand
 from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS, BackupConfig
-from aeonsync.utils import RemoteExecutor, RemoteInfo, parse_remote, get_backup_stats
+from aeonsync.utils import get_backup_stats
 
 logger = logging.getLogger(__name__)
 
 
-class AeonBackup:
+class AeonBackup(BaseCommand):
     """Handles backup operations for AeonSync."""
 
     def __init__(self, config: BackupConfig):
@@ -23,13 +24,7 @@ class AeonBackup:
         Args:
             config (BackupConfig): Backup configuration
         """
-        self.config = config
-        self.remote_info: RemoteInfo = parse_remote(
-            self.config.remote, self.config.remote_port
-        )
-        self.executor = RemoteExecutor(
-            self.remote_info, self.config.ssh_key, self.config.remote_port
-        )
+        super().__init__(config)
         self.date = datetime.now().strftime("%Y-%m-%d")
         self.backup_path = f"{self.remote_info.path}/{HOSTNAME}/{self.date}"
         self.latest_link = f"{self.remote_info.path}/{HOSTNAME}/latest"
