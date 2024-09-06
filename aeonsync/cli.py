@@ -38,6 +38,8 @@ def get_backup_config(
     ctx: typer.Context, sources: List[Path], retention: int, dry_run: bool
 ) -> BackupConfig:
     """Create a BackupConfig instance from the context and command options."""
+    if not sources:
+        sources = [Path(s) for s in DEFAULT_SOURCE_DIRS]
     return BackupConfig(
         remote=ctx.obj["remote"],
         sources=sources,
@@ -111,6 +113,7 @@ def restore(
 ):
     """Restore a specific file from a backup."""
     try:
+        # Use an empty list for sources, it will be populated with defaults in get_backup_config
         config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
         aeonsync = AeonSync(config)
 

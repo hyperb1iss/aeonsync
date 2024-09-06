@@ -27,24 +27,56 @@ def aeon_restore(mock_config):
 
 
 def test_get_remote_relative_path(aeon_restore):
+    # Create a new BackupConfig instance for testing
+    test_config = BackupConfig(
+        remote=aeon_restore.config.remote,
+        sources=["/home/user"],
+        full=False,
+        dry_run=False,
+        ssh_key=None,
+        remote_port=None,
+        verbose=False,
+        retention_period=7,
+        log_file=None,
+    )
+    aeon_restore.config = test_config
+
     # Test file within backup source
     assert aeon_restore._get_remote_relative_path(
         Path("/home/user/documents/file.txt")
-    ) == Path("file.txt")
+    ) == Path("user/documents/file.txt")
     assert aeon_restore._get_remote_relative_path(
         Path("/home/user/photos/image.jpg")
-    ) == Path("image.jpg")
+    ) == Path("user/photos/image.jpg")
 
     # Test file in subdirectory
     assert aeon_restore._get_remote_relative_path(
         Path("/home/user/documents/subfolder/file.txt")
-    ) == Path("subfolder/file.txt")
+    ) == Path("user/documents/subfolder/file.txt")
 
     # Test file not in backup source
     assert (
-        aeon_restore._get_remote_relative_path(Path("/home/user/music/song.mp3"))
+        aeon_restore._get_remote_relative_path(Path("/home/other_user/music/song.mp3"))
         is None
     )
+
+    # Test with multiple sources
+    test_config = BackupConfig(
+        remote=aeon_restore.config.remote,
+        sources=["/home/user", "/var/www"],
+        full=False,
+        dry_run=False,
+        ssh_key=None,
+        remote_port=None,
+        verbose=False,
+        retention_period=7,
+        log_file=None,
+    )
+    aeon_restore.config = test_config
+
+    assert aeon_restore._get_remote_relative_path(
+        Path("/var/www/html/index.html")
+    ) == Path("www/html/index.html")
 
 
 def test_get_file_versions(aeon_restore):
@@ -58,9 +90,15 @@ def test_get_file_versions(aeon_restore):
 
 def test_file_exists_in_backup(aeon_restore):
     with patch.object(aeon_restore.executor, "run_command") as mock_run:
+        # Test when file exists
         mock_run.return_value.stdout = "exists\n"
         assert aeon_restore._file_exists_in_backup("2023-01-01", "file.txt") == True
 
+        # Test when file doesn't exist
+        mock_run.return_value.stdout = ""
+        assert aeon_restore._file_exists_in_backup("2023-01-01", "file.txt") == False
+
+        # Test when an exception occurs
         mock_run.side_effect = Exception("SSH Error")
         assert aeon_restore._file_exists_in_backup("2023-01-01", "file.txt") == False
 
