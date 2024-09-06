@@ -8,7 +8,7 @@
 
 *A powerful and flexible remote backup tool for developers and system administrators*
 
-[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Configuration](#configuration) • [Development](#development) • [Contributing](#contributing) • [License](#license)
+[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Configuration](#%EF%B8%8F-configuration) • [Development](#%EF%B8%8F-development) • [Contributing](#-contributing) • [License](#-license)
 
 </div>
 
@@ -25,6 +25,11 @@
 - 🔍 Verbose mode for detailed transfer logs
 - 🗂️ Multiple source directory support
 - 🔁 Automatic latest backup symlink creation
+- 🕰️ Version selection for file restores
+- 👀 File preview before restoration
+- 📊 Diff display to compare file versions
+- 🔄 Interactive restore mode for user-friendly file recovery
+- 📜 Comprehensive backup listing with detailed information
 
 ## 💻 Installation
 <a name="installation"></a>
@@ -79,11 +84,28 @@ aeon --help
 aeon sync [OPTIONS]
 
 # Restore a file from a specific backup date
-aeon restore [OPTIONS] FILE DATE
+aeon restore [OPTIONS] FILE [DATE]
 
 # List all available backups
 aeon list-backups [OPTIONS]
 ```
+
+### Restore Functionality
+
+AeonSync offers powerful restore capabilities:
+
+- 🕰️ **Version Selection**: Choose from multiple backup versions of a file.
+- 👀 **File Preview**: View file contents before restoring.
+- 📊 **Diff Display**: Compare changes between versions.
+- 🔄 **Interactive Mode**: User-friendly guided restore process.
+
+To use the interactive restore mode:
+
+```bash
+aeon restore --interactive
+```
+
+This will guide you through selecting a backup date, choosing a file, and specifying the restore location.
 
 For a full list of available commands and options, use:
 
