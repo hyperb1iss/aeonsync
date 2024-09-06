@@ -44,3 +44,4 @@ class BackupConfig(NamedTuple):
     remote_port: Optional[int] = None
     verbose: bool = False
     retention_period: int = DEFAULT_RETENTION_PERIOD
+    log_file: Optional[str] = None

@@ -13,7 +13,7 @@ from aeonsync.config import (
     DEFAULT_SOURCE_DIRS,
     BackupConfig,
 )
-from aeonsync import AeonSync
+from aeonsync.core import AeonSync
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
@@ -98,16 +98,29 @@ def sync(
 @app.command()
 def restore(
     ctx: typer.Context,
-    file: Path = typer.Argument(..., help="File to restore"),
-    date: str = typer.Argument(..., help="Backup date to restore from"),
+    file: Optional[Path] = typer.Argument(
+        None, help="File to restore (current directory if not specified)"
+    ),
+    date: Optional[str] = typer.Argument(None, help="Backup date to restore from"),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output directory for restored file"
+    ),
+    interactive: bool = typer.Option(
+        False, "--interactive", "-i", help="Use fully interactive mode for restore"
+    ),
 ):
     """Restore a specific file from a backup."""
     try:
         config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
         aeonsync = AeonSync(config)
-        with console.status(f"[bold green]Restoring file {file} from {date}..."):
-            aeonsync.restore(date, str(file))
-        console.print(f"[bold green]File {file} restored successfully from {date}.")
+
+        if interactive:
+            aeonsync.restore.restore_interactive()
+        else:
+            if file is None:
+                file = Path.cwd()
+            aeonsync.restore.restore_file_versions(str(file), date, output_dir)
+
     except Exception as e:
         logger.error("File restoration failed: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
