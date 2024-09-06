@@ -1,171 +1,167 @@
-# AeonSync
+# 🌀 AeonSync
 
-_AeonSync: Flexible Remote Backup Tool_
+<div align="center">
 
-**AeonSync** is a powerful, flexible backup tool designed to efficiently sync directories to a remote server using rsync over SSH. Built with developers and sysadmins in mind, AeonSync provides incremental backups, intelligent file linking, and customizable retention policies. With a simple setup and robust error handling, it's your one-stop solution for reliable, automated backups.
+[![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
+[![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)](https://opensource.org/licenses/GPL-3.0)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
----
+*A powerful and flexible remote backup tool for developers and system administrators*
 
-## Table of Contents
+[Features](#features) • [Installation](#installation) • [Usage](#usage) • [Configuration](#configuration) • [Development](#development) • [Contributing](#contributing) • [License](#license)
 
-- [Why AeonSync?](#why-aeonsync)
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Usage](#usage)
-- [Setup](#setup)
-- [Configuration](#configuration)
-- [Automating Backups](#automating-backups)
-- [Restoring Files](#restoring-files)
-- [Contributing](#contributing)
+</div>
 
----
+## ✨ Features
+<a name="features"></a>
 
-## Why AeonSync?
+- 🔄 Incremental backups using rsync's `--link-dest` for efficient storage
+- 🔐 Secure remote syncing via SSH
+- ⏱️ Customizable retention policies for automatic cleanup
+- 🧪 Dry-run mode for testing backups without making changes
+- 📊 Detailed metadata tracking for each backup
+- 🖥️ User-friendly command-line interface powered by Typer
+- 🎨 Rich console output for improved readability
+- 🔍 Verbose mode for detailed transfer logs
+- 🗂️ Multiple source directory support
+- 🔁 Automatic latest backup symlink creation
 
-We live in an era where data matters. Whether you're working on the next big project or safeguarding essential personal files, data loss is never an option. AeonSync helps ensure that your important files are always safe—incrementally and efficiently.
+## 💻 Installation
+<a name="installation"></a>
 
-- **Simplicity Meets Power**: Run a single command to back up your critical files. AeonSync handles the rest—hard linking, SSH connections, and ensuring that only changed files are synced.
-- **Customizable**: Configure the remote server, backup intervals, retention periods, and more to match your needs.
-- **Incremental and Intelligent**: Why back up everything when only a few files have changed? AeonSync uses hard links for files that haven’t changed, saving space and time.
+You can install AeonSync using either pip or Poetry:
 
----
+### Using pip
 
-## Features
-
-- **Incremental Backups**: Only backs up changed files, using rsync’s `--link-dest` to create hard links for unchanged files.
-- **Remote Syncing via SSH**: Use any server you can SSH into.
-- **Customizable Retention**: Clean up old backups automatically with customizable retention policies.
-- **Verbose and Dry-Run Modes**: Test backups before running them with `--dry-run` and view detailed transfer logs with `--verbose`.
-- **Metadata Tracking**: Every backup comes with a detailed JSON metadata file, making tracking and restoring files easy.
-- **Ease of Use**: Minimal setup, intuitive commands, and automated directory creation.
-
----
-
-## Quick Start
-
-Here’s how to get AeonSync up and running in a matter of minutes:
-
-1. **Install dependencies**: You need Python 3 and rsync. Install them if you don't already have them.
-    ```bash
-    sudo apt-get install rsync python3
-    ```
-
-2. **Clone the repository**:
-    ```bash
-    git clone https://github.com/hyperb1iss/aeonsync.git
-    cd aeonsync
-    ```
-
-3. **First-time setup**:
-    Run the setup wizard to configure AeonSync:
-    ```bash
-    python aeonsync.py setup
-    ```
-
-4. **Run your first backup**:
-    ```bash
-    python aeonsync.py sync --remote bliss@cloudless:aeonsync
-    ```
-
----
-
-## Usage
-
-AeonSync’s usage is simple yet powerful. Here’s an overview of the main commands:
-
-### **Backup Command**
 ```bash
-python aeonsync.py sync [options]
+pip install aeonsync
 ```
-**Options**:
-- `--sources`: Specify the directories you want to back up (default: `/home`).
-- `--remote`: Remote server in `user@host:path` format (default: `bliss@cloudless:aeonsync`).
-- `--port`: Specify the SSH port if it’s not the default (22).
-- `--ssh-key`: Path to the SSH key for authentication.
-- `--dry-run`: Perform a dry run without actually making changes.
-- `--verbose`: Output detailed rsync logs.
 
-### **List Available Backups**
+### Using Poetry
+
 ```bash
-python aeonsync.py list [options]
+git clone https://github.com/hyperb1iss/aeonsync.git
+cd aeonsync
+poetry install
 ```
-Lists all available backups on the remote server, along with metadata.
 
-### **Restore a File**
+After installation, the `aeon` command will be available in your system path.
+
+### Prerequisites
+
+- Python 3.12 or higher
+- SSH access to a remote server
+- rsync installed on both local and remote systems
+
+## 🚀 Usage
+<a name="usage"></a>
+
+AeonSync provides an intuitive command-line interface for easy interaction with your backup setup.
+
 ```bash
-python aeonsync.py restore --file <path> --date <backup-date> [options]
+# Perform a backup
+aeon sync --remote user@host:/path/to/backups
+
+# Restore a file
+aeon restore /path/to/file 2024-09-05
+
+# List available backups
+aeon list-backups
+
+# Show help
+aeon --help
 ```
-Restore a specific file from a specific backup date.
+
+### Main Commands
+
+```bash
+# Perform a backup with custom options
+aeon sync [OPTIONS]
+
+# Restore a file from a specific backup date
+aeon restore [OPTIONS] FILE DATE
+
+# List all available backups
+aeon list-backups [OPTIONS]
+```
+
+For a full list of available commands and options, use:
+
+```bash
+aeon --help
+```
+
+## ⚙️ Configuration
+<a name="configuration"></a>
+
+AeonSync can be configured using command-line options or by modifying the `config.py` file:
+
+- `DEFAULT_REMOTE`: Default remote server for backups
+- `DEFAULT_RETENTION_PERIOD`: Default number of days to keep backups
+- `DEFAULT_SOURCE_DIRS`: Default directories to back up
+- `EXCLUSIONS`: Patterns to exclude from backups
+
+Example configuration in `config.py`:
+
+```python
+DEFAULT_REMOTE = "user@example.com:/backups"
+DEFAULT_RETENTION_PERIOD = 30
+DEFAULT_SOURCE_DIRS = ["/home/user", "/var/www"]
+EXCLUSIONS = [".cache", "*/node_modules", "*.tmp"]
+```
+
+## 🛠️ Development
+<a name="development"></a>
+
+To set up the development environment:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/hyperb1iss/aeonsync.git
+   cd aeonsync
+   ```
+2. Install Poetry if you haven't already: `pip install poetry`
+3. Install dependencies: `poetry install`
+4. Activate the virtual environment: `poetry shell`
+
+To run tests:
+
+```bash
+pytest
+```
+
+## 👥 Contributing
+<a name="contributing"></a>
+
+Contributions to AeonSync are welcome! Here's how you can contribute:
+
+1. Fork the repository
+2. Create a new branch: `git checkout -b feature-branch-name`
+3. Make your changes and commit them: `git commit -m 'Add some feature'`
+4. Push to the branch: `git push origin feature-branch-name`
+5. Submit a pull request
+
+Please ensure your code adheres to the project's style guide (we use Black for formatting) and passes all tests.
+
+## 📄 License
+<a name="license"></a>
+
+This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Setup
+<div align="center">
 
-The **setup wizard** helps you configure AeonSync for your environment. You’ll be prompted to enter the following:
+📚 [Documentation](#) • 🐛 [Report Bug](https://github.com/hyperb1iss/aeonsync/issues) • 💡 [Request Feature](https://github.com/hyperb1iss/aeonsync/issues)
 
-- **Remote Server**: Enter your remote server’s address (`user@host:path`).
-- **SSH Port**: The port your SSH server is running on.
-- **Backup Directory**: Where you’d like to store your backups on the remote server.
-
-For advanced users, these settings can also be managed directly via the command line.
+</div>
 
 ---
 
-## Configuration
+<div align="center">
 
-AeonSync offers several options to fit different backup needs:
+Created by [Stefanie Jane 🌠](https://github.com/hyperb1iss)
 
-- **Sources**: Define which directories you’d like to back up.
-- **Exclusions**: Common temporary or cache files are excluded by default, but this can be customized in the script.
-- **Retention**: Define how many days you’d like to retain backups (default: 7 days).
+If you find this project useful, [buy me a Monster Ultra Violet!](https://ko-fi.com/hyperb1iss)! ⚡️
 
----
-
-## Automating Backups
-
-Automating your backups is easy using **cron** or any other job scheduler.
-
-1. Open your crontab:
-    ```bash
-    crontab -e
-    ```
-
-2. Add a line like this to back up your files daily at midnight:
-    ```bash
-    0 0 * * * /usr/bin/python3 /path/to/aeonsync/aeonsync.py sync --remote bliss@cloudless:aeonsync --ssh-key ~/.ssh/id_rsa
-    ```
-
----
-
-## Restoring Files
-
-Need to restore a file? No problem.
-
-1. Find the backup date by listing available backups:
-    ```bash
-    python aeonsync.py list
-    ```
-
-2. Restore a specific file from a specific backup:
-    ```bash
-    python aeonsync.py restore --file /path/to/file --date 2024-09-04 --remote bliss@cloudless:aeonsync
-    ```
-
----
-
-## Contributing
-
-AeonSync is an open-source project, and contributions are always welcome. If you have a feature request, find a bug, or have improvements to suggest, please feel free to open an issue or a pull request!
-
-**To contribute**:
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/awesome-feature`).
-3. Commit your changes (`git commit -m 'Add some awesome feature'`).
-4. Push to the branch (`git push origin feature/awesome-feature`).
-5. Open a pull request.
-
----
-
-## License
-
-AeonSync is licensed under the MIT License. See [LICENSE](LICENSE) for more details.
+</div>
