@@ -8,14 +8,15 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-typer = "^0.9.0"
+typer = "^0.12.5"
 rich = "^13.8.0"
 prompt-toolkit = "^3.0.47"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.3.1"
+pytest = "^8.3.2"
 pylint = "^3.2.7"
 mypy = "^1.11.2"
+pytest-cov = "^5.0.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -25,7 +26,21 @@ build-backend = "poetry.core.masonry.api"
 aeon = "aeonsync.cli:app"
 
 [tool.pytest.ini_options]
+addopts = "--cov=aeonsync --cov-report=term-missing"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["aeonsync"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError:",
+]
 
 [tool.pylint.messages_control]
 disable = "C0111"
