@@ -13,7 +13,6 @@
 </div>
 
 ## ✨ Features
-<a name="features"></a>
 
 - 🔄 Incremental backups using rsync's `--link-dest` for efficient storage
 - 🔐 Secure remote syncing via SSH
@@ -32,9 +31,12 @@
 - 📜 Comprehensive backup listing with detailed information
 
 ## 💻 Installation
-<a name="installation"></a>
 
-You can install AeonSync using either pip or Poetry:
+### Prerequisites
+
+- Python 3.12 or higher
+- SSH access to a remote server
+- rsync installed on both local and remote systems
 
 ### Using pip
 
@@ -52,42 +54,24 @@ poetry install
 
 After installation, the `aeon` command will be available in your system path.
 
-### Prerequisites
-
-- Python 3.12 or higher
-- SSH access to a remote server
-- rsync installed on both local and remote systems
-
 ## 🚀 Usage
-<a name="usage"></a>
 
 AeonSync provides an intuitive command-line interface for easy interaction with your backup setup.
+
+### Basic Commands
 
 ```bash
 # Perform a backup
 aeon sync --remote user@host:/path/to/backups
 
 # Restore a file
-aeon restore /path/to/file 2024-09-05
+aeon restore [OPTIONS] FILE [DATE]
 
 # List available backups
-aeon list-backups
+aeon list-backups [OPTIONS]
 
 # Show help
 aeon --help
-```
-
-### Main Commands
-
-```bash
-# Perform a backup with custom options
-aeon sync [OPTIONS]
-
-# Restore a file from a specific backup date
-aeon restore [OPTIONS] FILE [DATE]
-
-# List all available backups
-aeon list-backups [OPTIONS]
 ```
 
 ### Restore Functionality
@@ -107,14 +91,7 @@ aeon restore --interactive
 
 This will guide you through selecting a backup date, choosing a file, and specifying the restore location.
 
-For a full list of available commands and options, use:
-
-```bash
-aeon --help
-```
-
 ## ⚙️ Configuration
-<a name="configuration"></a>
 
 AeonSync can be configured using command-line options or by modifying the `config.py` file:
 
@@ -133,7 +110,6 @@ EXCLUSIONS = [".cache", "*/node_modules", "*.tmp"]
 ```
 
 ## 🛠️ Development
-<a name="development"></a>
 
 To set up the development environment:
 
@@ -153,7 +129,6 @@ pytest
 ```
 
 ## 👥 Contributing
-<a name="contributing"></a>
 
 Contributions to AeonSync are welcome! Here's how you can contribute:
 
@@ -166,7 +141,6 @@ Contributions to AeonSync are welcome! Here's how you can contribute:
 Please ensure your code adheres to the project's style guide (we use Black for formatting) and passes all tests.
 
 ## 📄 License
-<a name="license"></a>
 
 This project is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for details.
 
@@ -176,14 +150,8 @@ This project is licensed under the GNU General Public License v3.0. See the [LIC
 
 📚 [Documentation](#) • 🐛 [Report Bug](https://github.com/hyperb1iss/aeonsync/issues) • 💡 [Request Feature](https://github.com/hyperb1iss/aeonsync/issues)
 
-</div>
-
----
-
-<div align="center">
-
 Created by [Stefanie Jane 🌠](https://github.com/hyperb1iss)
 
-If you find this project useful, [buy me a Monster Ultra Violet!](https://ko-fi.com/hyperb1iss)! ⚡️
+If you find this project useful, [buy me a Monster Ultra Violet!](https://ko-fi.com/hyperb1iss) ⚡️
 
 </div>
