@@ -6,12 +6,14 @@ from typing import List, Optional
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from aeonsync.config import (
+    config_manager,
+    BackupConfig,
     DEFAULT_REMOTE,
     DEFAULT_RETENTION_PERIOD,
     DEFAULT_SOURCE_DIRS,
-    BackupConfig,
 )
 from aeonsync.core import AeonSync
 
@@ -86,8 +88,8 @@ def sync(
 ):
     """Create a backup of specified sources to the remote destination."""
     try:
-        config = get_backup_config(ctx, sources, retention, dry_run)
-        aeonsync = AeonSync(config)
+        backup_config = get_backup_config(ctx, sources, retention, dry_run)
+        aeonsync = AeonSync(backup_config)
         with console.status("[bold green]Performing backup..."):
             aeonsync.sync()
         console.print("[bold green]Backup completed successfully.")
@@ -114,8 +116,8 @@ def restore(
     """Restore a specific file from a backup."""
     try:
         # Use an empty list for sources, it will be populated with defaults in get_backup_config
-        config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
-        aeonsync = AeonSync(config)
+        backup_config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
+        aeonsync = AeonSync(backup_config)
 
         if interactive:
             aeonsync.restore.restore_interactive()
@@ -134,13 +136,100 @@ def restore(
 def list_backups(ctx: typer.Context):
     """List all available backups with their metadata."""
     try:
-        config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
-        aeonsync = AeonSync(config)
+        backup_config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
+        aeonsync = AeonSync(backup_config)
         aeonsync.list_backups()
     except Exception as e:
         logger.error("Failed to list backups: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def config(  # pylint: disable=too-many-arguments,too-many-branches
+    hostname: Optional[str] = typer.Option(None, help="Set the hostname"),
+    remote_address: Optional[str] = typer.Option(None, help="Set the remote address"),
+    remote_path: Optional[str] = typer.Option(None, help="Set the remote path"),
+    remote_port: Optional[int] = typer.Option(None, help="Set the remote port"),
+    retention_period: Optional[int] = typer.Option(
+        None, help="Set the retention period in days"
+    ),
+    add_source_dir: Optional[str] = typer.Option(None, help="Add a source directory"),
+    remove_source_dir: Optional[str] = typer.Option(
+        None, help="Remove a source directory"
+    ),
+    add_exclusion: Optional[str] = typer.Option(None, help="Add an exclusion pattern"),
+    remove_exclusion: Optional[str] = typer.Option(
+        None, help="Remove an exclusion pattern"
+    ),
+    ssh_key: Optional[str] = typer.Option(None, help="Set the SSH key path"),
+    verbose: Optional[bool] = typer.Option(None, help="Set verbose mode"),
+    log_file: Optional[str] = typer.Option(None, help="Set the log file path"),
+    show: bool = typer.Option(False, "--show", help="Show current configuration"),
+):
+    """View or edit the AeonSync configuration."""
+    if show:
+        show_config(config_manager.config)
+        return
+
+    changed = False
+    if hostname is not None:
+        config_manager.set("hostname", hostname)
+        changed = True
+    if remote_address is not None:
+        config_manager.set("remote_address", remote_address)
+        changed = True
+    if remote_path is not None:
+        config_manager.set("remote_path", remote_path)
+        changed = True
+    if remote_port is not None:
+        config_manager.set("remote_port", remote_port)
+        changed = True
+    if retention_period is not None:
+        config_manager.set("retention_period", retention_period)
+        changed = True
+    if add_source_dir:
+        config_manager.add_to_list("source_dirs", add_source_dir)
+        changed = True
+    if remove_source_dir:
+        config_manager.remove_from_list("source_dirs", remove_source_dir)
+        changed = True
+    if add_exclusion:
+        config_manager.add_to_list("exclusions", add_exclusion)
+        changed = True
+    if remove_exclusion:
+        config_manager.remove_from_list("exclusions", remove_exclusion)
+        changed = True
+    if ssh_key is not None:
+        config_manager.set("ssh_key", ssh_key)
+        changed = True
+    if verbose is not None:
+        config_manager.set("verbose", verbose)
+        changed = True
+    if log_file is not None:
+        config_manager.set("log_file", log_file)
+        changed = True
+
+    if changed:
+        console.print("Configuration updated successfully!", style="bold green")
+    else:
+        console.print("No changes were made to the configuration.", style="yellow")
+
+    show_config(config_manager.config)
+
+
+def show_config(config_dict: dict):
+    """Display the current configuration."""
+    table = Table(title="AeonSync Configuration")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+
+    for key, value in config_dict.items():
+        if isinstance(value, list):
+            value = "\n".join(map(str, value))
+        table.add_row(key, str(value))
+
+    console.print(table)
 
 
 if __name__ == "__main__":

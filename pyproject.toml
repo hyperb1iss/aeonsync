@@ -11,12 +11,15 @@ python = "^3.12"
 typer = "^0.12.5"
 rich = "^13.8.0"
 prompt-toolkit = "^3.0.47"
+toml = "^0.10.2"
+appdirs = "^1.4.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.2"
 pylint = "^3.2.7"
 mypy = "^1.11.2"
 pytest-cov = "^5.0.0"
+types-toml = "^0.10.8.20240310"
 
 [build-system]
 requires = ["poetry-core"]
