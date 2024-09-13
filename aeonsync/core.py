@@ -8,6 +8,7 @@ from aeonsync.list import ListBackups
 
 logger = logging.getLogger(__name__)
 
+
 class AeonSync:
     """Main class for orchestrating AeonSync operations."""
 
@@ -20,7 +21,7 @@ class AeonSync:
         """
         self.config = config
         self.backup = AeonBackup(config)
-        self.restore = AeonRestore(config)
+        self.restore_obj = AeonRestore(config)
         self.list_backups_obj = ListBackups(config)
 
     def sync(self) -> None:
@@ -45,7 +46,7 @@ class AeonSync:
             backup_date (str): Date of the backup to restore from
             file_path (str): Path of the file to restore
         """
-        self.restore.restore_file(backup_date, file_path)
+        self.restore_obj.restore_file(backup_date, file_path)
 
     def list_backups(self) -> None:
         """List all available backups with their metadata."""

@@ -3,6 +3,7 @@
 from aeonsync.config import BackupConfig
 from aeonsync.utils import RemoteInfo, parse_remote, RemoteExecutor
 
+
 class BaseCommand:
     """Base class for AeonSync commands."""
 
@@ -20,6 +21,3 @@ class BaseCommand:
         self.executor = RemoteExecutor(
             self.remote_info, self.config.ssh_key, self.config.remote_port
         )
-
-# Import AeonSync at the end to avoid circular imports
-from aeonsync.core import AeonSync  # noqa: E402, F401

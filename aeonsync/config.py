@@ -15,6 +15,13 @@ class ConfigManager:
     CONFIG_FILE_NAME = "config.toml"
 
     def __init__(self, config_dir: Optional[Path] = None):
+        """
+        Initialize ConfigManager with the specified configuration directory.
+
+        Args:
+            config_dir (Optional[Path], optional): Path to the configuration directory.
+                Defaults to the user config directory.
+        """
         self.config_dir = config_dir or Path(user_config_dir(self.APP_NAME))
         self.config_file_path = self.config_dir / self.CONFIG_FILE_NAME
         self.config: Dict[str, Any] = {}  # Initialize config as an empty dict
@@ -22,6 +29,11 @@ class ConfigManager:
 
     @property
     def default_config(self) -> Dict[str, Any]:
+        """Provide default configuration values.
+
+        Returns:
+            Dict[str, Any]: Default configuration dictionary.
+        """
         return {
             "hostname": socket.gethostname(),
             "remote_address": "user@example.com",
@@ -65,23 +77,49 @@ class ConfigManager:
             self.save_config(self.config)
 
     def save_config(self, new_config: Dict[str, Any]) -> None:
-        """Save the configuration to file."""
+        """
+        Save the configuration to file.
+
+        Args:
+            new_config (Dict[str, Any]): The new configuration dictionary to save.
+        """
         self.config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_file_path, "w", encoding="utf-8") as config_file:
             toml.dump(new_config, config_file)
         self.config = new_config
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a configuration value."""
+        """
+        Get a configuration value.
+
+        Args:
+            key (str): The configuration key.
+            default (Any, optional): The default value if key is not found. Defaults to None.
+
+        Returns:
+            Any: The configuration value.
+        """
         return self.config.get(key, default)
 
     def set(self, key: str, value: Any) -> None:
-        """Set a configuration value and save the configuration."""
+        """
+        Set a configuration value and save the configuration.
+
+        Args:
+            key (str): The configuration key.
+            value (Any): The value to set.
+        """
         self.config[key] = value
         self.save_config(self.config)
 
     def add_to_list(self, key: str, value: Any) -> None:
-        """Add a value to a list configuration item."""
+        """
+        Add a value to a list configuration item.
+
+        Args:
+            key (str): The configuration key associated with a list.
+            value (Any): The value to add to the list.
+        """
         if key not in self.config or not isinstance(self.config[key], list):
             self.config[key] = []
         if value not in self.config[key]:
@@ -89,7 +127,13 @@ class ConfigManager:
             self.save_config(self.config)
 
     def remove_from_list(self, key: str, value: Any) -> None:
-        """Remove a value from a list configuration item."""
+        """
+        Remove a value from a list configuration item.
+
+        Args:
+            key (str): The configuration key associated with a list.
+            value (Any): The value to remove from the list.
+        """
         if key in self.config and isinstance(self.config[key], list):
             if value in self.config[key]:
                 self.config[key].remove(value)

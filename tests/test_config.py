@@ -1,19 +1,37 @@
 """Tests for AeonSync configuration management."""
 
 from time import sleep
+
 import pytest
+
 from aeonsync.config import ConfigManager
 
 
 @pytest.fixture(name="temp_config_dir")
 def fixture_temp_config_dir(tmp_path):
-    """Fixture to provide a temporary directory for config files."""
+    """
+    Fixture to provide a temporary directory for config files.
+
+    Args:
+        tmp_path (Path): Pytest's temporary path fixture.
+
+    Returns:
+        Path: Path to the temporary configuration directory.
+    """
     return tmp_path / "config"
 
 
 @pytest.fixture(name="config_manager")
 def fixture_config_manager(temp_config_dir):
-    """Fixture to provide a ConfigManager instance with a temporary config directory."""
+    """
+    Fixture to provide a ConfigManager instance with a temporary config directory.
+
+    Args:
+        temp_config_dir (Path): Temporary configuration directory.
+
+    Returns:
+        ConfigManager: Instance of ConfigManager.
+    """
     return ConfigManager(config_dir=temp_config_dir)
 
 
@@ -68,9 +86,10 @@ def test_nonexistent_key(config_manager):
 def test_overwrite_protection(config_manager):
     """Test that the configuration is saved when changes are made."""
     original_mtime = config_manager.config_file_path.stat().st_mtime
-    sleep(0.01)  # Small delay to ensure timestamp can change
+    # Adding a small delay to ensure timestamp can change
+    sleep(0.01)
     config_manager.set("test_key", "test_value")
-    sleep(0.01)  # Another small delay
+    sleep(0.01)
     new_mtime = config_manager.config_file_path.stat().st_mtime
     assert (
         new_mtime > original_mtime

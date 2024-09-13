@@ -1,5 +1,3 @@
-# pylint: disable=useless-parent-delegation
-
 """List backups functionality for AeonSync."""
 
 import json
@@ -86,10 +84,9 @@ class ListBackups(BaseCommand):
         console.print(table)
         self._print_backup_summary(backups, console)
 
-    @staticmethod
-    def _add_backup_to_table(backup: Dict, table: Table) -> None:
+    def _add_backup_to_table(self, backup: Dict, table: Table) -> None:
         """Add a single backup entry to the display table."""
-        if isinstance(backup, str) or "error" in backup:
+        if "error" in backup:
             table.add_row(
                 backup.get("date", "Unknown"),
                 "Error",
@@ -123,8 +120,8 @@ class ListBackups(BaseCommand):
                     hostname,
                     sources,
                     stats.get("number_of_files", "N/A"),
-                    ListBackups._format_size(stats.get("total_file_size", "N/A")),
-                    ListBackups._format_duration(duration),
+                    self._format_size(stats.get("total_file_size", "N/A")),
+                    self._format_duration(duration),
                 )
             except (ValueError, AttributeError, TypeError) as e:
                 logger.warning("Error processing backup data: %s", e)
@@ -137,11 +134,10 @@ class ListBackups(BaseCommand):
                     "N/A",
                 )
 
-    @staticmethod
-    def _print_backup_summary(backups: List[Dict], console: Console) -> None:
+    def _print_backup_summary(self, backups: List[Dict], console: Console) -> None:
         """Print a summary of the backup list."""
         total_backups = len(backups)
-        valid_backups = [b for b in backups if isinstance(b, dict) and "error" not in b]
+        valid_backups = [b for b in backups if "error" not in b]
         latest_backup = max(
             valid_backups,
             key=lambda x: x.get("date", "") or x.get("start_time", ""),

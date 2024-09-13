@@ -1,4 +1,3 @@
-# pylint: disable=too-many-arguments
 """
 Restore functionality for AeonSync.
 
@@ -578,33 +577,6 @@ class AeonRestore(BaseCommand):
             if selected in versions:
                 logger.debug("Selected version: %s", selected)
                 return selected
-            logger.warning("Invalid date selected: %s", selected)
-            self.console.print(
-                "[red]Invalid date. Please choose from the list above.[/red]"
-            )
-
-    def _select_version(self, versions: List[str]) -> str:
-        """
-        Let the user select a version from the list.
-
-        Args:
-            versions (List[str]): List of available versions
-
-        Returns:
-            str: Selected version date
-        """
-        logger.debug("Selecting version from %d available versions", len(versions))
-        table = Table(title="Available Versions")
-        table.add_column("Date", style="cyan")
-        for version in versions:
-            table.add_row(version)
-        self.console.print(table)
-
-        while True:
-            selected = prompt("Enter the date of the version to restore: ")
-            if selected in versions:
-                logger.debug("Selected version: %s", selected)
-                return selected
             logger.warning("Invalid version selected: %s", selected)
             self.console.print(
                 "[red]Invalid date. Please choose from the list above.[/red]"
@@ -648,11 +620,12 @@ class AeonRestore(BaseCommand):
         Returns:
             str: Formatted file size
         """
+        size = float(size_bytes)  # Initialize a float variable for calculations
         for unit in ["B", "KB", "MB", "GB", "TB"]:
-            if size_bytes < 1024.0:
-                return f"{size_bytes:.2f} {unit}"
-            size_bytes /= 1024.0
-        return f"{size_bytes:.2f} PB"
+            if size < 1024.0:
+                return f"{size:.2f} {unit}"
+            size /= 1024.0
+        return f"{size:.2f} PB"
 
     def _show_restore_summary(
         self, backup_date: str, remote_relative_path: str, restore_path: str
@@ -663,7 +636,7 @@ class AeonRestore(BaseCommand):
         Args:
             backup_date (str): Backup date
             remote_relative_path (str): Relative path of the file in the backup
-            restore_path (str): Path to restore the file to
+            restore_path (str): Path to restore to
         """
         logger.debug(
             "Showing restore summary: date=%s, remote_path=%s, restore_path=%s",
@@ -715,6 +688,7 @@ class AeonRestore(BaseCommand):
             )
         if choice == "s":
             logger.debug("User chose to skip restore")
+            self.console.print("[yellow]Skipping restore operation.[/yellow]")
             return False
 
         logger.warning("Invalid choice: %s", choice)
@@ -738,7 +712,10 @@ class AeonRestore(BaseCommand):
             remote_relative_path,
             restore_path,
         )
-        log_entry = f"{datetime.now().isoformat()} - Restored: {remote_relative_path} from {backup_date} to {restore_path}"
+        log_entry = (
+            f"{datetime.now().isoformat()} - Restored: {remote_relative_path} "
+            + f"from {backup_date} to {restore_path}"
+        )
         log_file = self.config.log_file or "aeon_restore.log"
 
         with open(log_file, "a", encoding="utf-8") as f:

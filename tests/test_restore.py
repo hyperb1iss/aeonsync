@@ -1,4 +1,4 @@
-# pylint: disable=protected-access, redefined-outer-name
+# pylint: disable=protected-access, redefined-outer-name, too-many-arguments, unused-argument
 """Test cases for AeonRestore functionality."""
 
 import subprocess
@@ -11,28 +11,13 @@ from aeonsync.config import BackupConfig
 
 
 @pytest.fixture
-def mock_config():
-    """Fixture for a mock BackupConfig."""
-    return BackupConfig(
-        remote="user@host:/backup",
-        sources=["/home/user/documents", "/home/user/photos"],
-        ssh_key="/path/to/key",
-        remote_port=22,
-        verbose=False,
-        dry_run=False,
-        retention_period=7,
-        log_file="aeon_restore.log",
-    )
-
-
-@pytest.fixture
-def aeon_restore(mock_config):
+def aeon_restore(sample_config):
     """Fixture for AeonRestore instance."""
     with patch("aeonsync.restore.Console"), patch("aeonsync.restore.prompt"):
-        return AeonRestore(mock_config)
+        return AeonRestore(sample_config)
 
 
-def test_get_remote_relative_path(aeon_restore):
+def test_get_remote_relative_path(aeon_restore, sample_config):
     """Test the _get_remote_relative_path method."""
     # Create a new BackupConfig instance for testing
     test_config = BackupConfig(
@@ -155,14 +140,14 @@ def test_get_restore_path_existing_file(mock_prompt, mock_exists, aeon_restore):
 @patch("aeonsync.restore.open")
 def test_log_restore_operation(mock_open, aeon_restore):
     """Test the logging of restore operations."""
-    aeon_restore._log_restore_operation(
-        "2023-01-01", "file.txt", "/tmp/restored_file.txt"
-    )
-    mock_open.assert_called_once()
-    mock_open.return_value.__enter__().write.assert_called_once()
+    with mock_open() as mock_file:
+        aeon_restore._log_restore_operation(
+            "2023-01-01", "file.txt", "/tmp/restored_file.txt"
+        )
+        mock_file.write.assert_called_once()
 
 
-# pylint: disable=too-many-arguments, unused-argument
+
 @patch.object(Path, "is_file", return_value=True)
 @patch.object(AeonRestore, "_confirm_and_restore")
 @patch.object(AeonRestore, "_get_restore_path")
@@ -254,7 +239,6 @@ def test_show_restore_summary(aeon_restore):
             mock_table.add_row.assert_has_calls(expected_calls)
 
 
-# pylint: disable=too-many-arguments, unused-argument
 @patch.object(Path, "is_file", return_value=False)
 @patch.object(Path, "is_dir", return_value=True)
 @patch.object(AeonRestore, "_confirm_and_restore")

@@ -85,7 +85,7 @@ class RemoteExecutor:
         return subprocess.run(full_cmd, capture_output=True, text=True, check=True)
 
     def rsync(
-        self, source: str, destination: str, extra_args: List[str] = None
+        self, source: str, destination: str, extra_args: Optional[List[str]] = None
     ) -> subprocess.CompletedProcess:
         """
         Run rsync command to sync files between local and remote.
@@ -93,7 +93,7 @@ class RemoteExecutor:
         Args:
             source (str): Source path (local or remote)
             destination (str): Destination path (local or remote)
-            extra_args (List[str], optional): Additional rsync arguments
+            extra_args (Optional[List[str]]): Additional rsync arguments
 
         Returns:
             subprocess.CompletedProcess: Result of the rsync execution
