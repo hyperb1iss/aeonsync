@@ -1,9 +1,11 @@
+# aeonsync/cli.py
+
 # pylint: disable=too-many-arguments,too-many-branches
 """Command-line interface for AeonSync."""
 
 import logging
 from pathlib import Path
-from typing import Sequence, Optional
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -39,13 +41,20 @@ port_option = typer.Option(None, help="Remote SSH port")
 verbose_option = typer.Option(False, help="Enable verbose output")
 
 
+def validate_sources(sources: List[Path]):
+    """Ensure all source directories exist."""
+    for source in sources:
+        if not source.exists() or not source.is_dir():
+            raise typer.BadParameter(f"Source directory does not exist or is not a directory: {source}")
+
+
 def get_backup_config(
-    ctx: typer.Context, sources: Sequence[Path], retention: int, dry_run: bool
+    ctx: typer.Context, sources: List[Path], retention: int, dry_run: bool
 ) -> BackupConfig:
     """Create a BackupConfig instance from the context and command options."""
     if not sources:
         sources = [Path(s) for s in DEFAULT_SOURCE_DIRS]
-    # Convert the Sequence[Path] to list[str | Path]
+    # Convert the List[Path] to list[str | Path]
     sources_list: list[str | Path] = [
         str(source) if isinstance(source, Path) else source for source in sources
     ]
@@ -82,13 +91,19 @@ def callback(
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
         logger.debug("Verbose mode enabled")
+    else:
+        logging.getLogger().setLevel(logging.INFO)
 
 
 @app.command()
 def sync(
     ctx: typer.Context,
-    sources: Sequence[Path] = typer.Option(
-        [Path(s) for s in DEFAULT_SOURCE_DIRS], help="Source directories to backup"
+    sources: List[Path] = typer.Option(
+        DEFAULT_SOURCE_DIRS,
+        "--source",
+        "-s",
+        help="Source directories to backup. Can be specified multiple times.",
+        show_default=True,
     ),
     retention: int = typer.Option(
         DEFAULT_RETENTION_PERIOD, help="Number of days to retain backups"
@@ -99,11 +114,16 @@ def sync(
 ):
     """Create a backup of specified sources to the remote destination."""
     try:
+        validate_sources(sources)
         backup_config = get_backup_config(ctx, sources, retention, dry_run)
         backup = AeonBackup(backup_config)
         with console.status("[bold green]Performing backup..."):
             backup.create_backup()
         console.print("[bold green]Backup completed successfully.")
+    except typer.BadParameter as e:
+        logger.error("Invalid parameter: %s", str(e))
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(code=1)
     except Exception as e:
         logger.error("Backup failed: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
@@ -112,7 +132,7 @@ def sync(
 
 @app.command()
 def restore(
-    _: typer.Context,
+    ctx: typer.Context,
     file: Optional[Path] = typer.Argument(
         None, help="File or directory to restore (current directory if not specified)"
     ),
@@ -133,7 +153,7 @@ def restore(
     """Restore a specific file or directory from a backup."""
     try:
         backup_config = BackupConfig(
-            remote=config_manager.get("remote"),
+            remote=ctx.obj["remote"],
             sources=[],  # Sources are not required for restore
             ssh_key=config_manager.get("ssh_key"),
             remote_port=config_manager.get("remote_port"),
@@ -160,12 +180,15 @@ def restore(
 
 
 @app.command()
-def list_backups(_: typer.Context):
+def list_backups(ctx: typer.Context):
     """List all available backups with their metadata."""
     try:
+        remote = ctx.obj.get("remote")
+        if not remote:
+            raise typer.BadParameter("Remote destination is not set.")
         backup_config = BackupConfig(
-            remote=config_manager.get("remote"),
-            sources=[],  # Sources are not required for listing backups
+            remote=remote,
+            sources=[],  # Sources are not required for restore
             ssh_key=config_manager.get("ssh_key"),
             remote_port=config_manager.get("remote_port"),
             verbose=config_manager.get("verbose"),
@@ -175,6 +198,10 @@ def list_backups(_: typer.Context):
         )
         list_backups_obj = ListBackups(backup_config)
         list_backups_obj.list()
+    except typer.BadParameter as e:
+        logger.error("Invalid parameter: %s", str(e))
+        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        raise typer.Exit(code=1)
     except Exception as e:
         logger.error("Failed to list backups: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
