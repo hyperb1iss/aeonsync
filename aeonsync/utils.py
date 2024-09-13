@@ -101,7 +101,7 @@ class RemoteExecutor:
         Raises:
             subprocess.CalledProcessError: If the rsync execution fails
         """
-        rsync_cmd = ["rsync", "-avz", "--delete"]
+        rsync_cmd = ["rsync", "-avz"]
         if extra_args:
             rsync_cmd.extend(extra_args)
 

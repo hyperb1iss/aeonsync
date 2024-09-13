@@ -55,15 +55,15 @@ class ListBackups(BaseCommand):
                 backups.append(backup)
                 current_json = ""
             except json.JSONDecodeError:
-                pass
+                current_json += "\n"  # Handle multi-line JSON objects
 
-        if current_json:
+        if current_json.strip():
             logger.warning("Incomplete JSON data: %s", current_json)
 
         return backups
 
     def _display_backup_list(self, backups: List[Dict]) -> None:
-        """Display the backup list in an informative format."""
+        """Display the backup list with metadata in an informative format."""
         console = Console()
 
         if not backups:
@@ -74,6 +74,8 @@ class ListBackups(BaseCommand):
             title="AeonSync Backups", show_header=True, header_style="bold magenta"
         )
         table.add_column("Date", style="cyan", no_wrap=True)
+        table.add_column("Hostname", style="magenta")
+        table.add_column("Sources", style="green")
         table.add_column("Files", justify="right", style="green")
         table.add_column("Size", justify="right", style="blue")
         table.add_column("Duration", justify="right", style="yellow")
@@ -88,28 +90,52 @@ class ListBackups(BaseCommand):
     def _add_backup_to_table(backup: Dict, table: Table) -> None:
         """Add a single backup entry to the display table."""
         if isinstance(backup, str) or "error" in backup:
-            table.add_row(backup.get("date", "Unknown"), "Error", "N/A", "N/A")
+            table.add_row(
+                backup.get("date", "Unknown"),
+                "Error",
+                "N/A",
+                "N/A",
+                "N/A",
+                "N/A",
+            )
         else:
             try:
-                start_time = datetime.fromisoformat(backup.get("start_time", ""))
-                end_time = datetime.fromisoformat(backup.get("end_time", ""))
+                start_time_str = backup.get("start_time", "")
+                end_time_str = backup.get("end_time", "")
+                start_time = (
+                    datetime.fromisoformat(start_time_str)
+                    if start_time_str
+                    else None
+                )
+                end_time = datetime.fromisoformat(end_time_str) if end_time_str else None
                 duration = (
                     end_time - start_time if start_time and end_time else timedelta()
                 )
 
                 stats = backup.get("stats", {})
+                hostname = backup.get("hostname", "Unknown")
+                sources = ", ".join(backup.get("sources", []))
                 table.add_row(
                     backup.get(
                         "date",
                         start_time.date().isoformat() if start_time else "Unknown",
                     ),
+                    hostname,
+                    sources,
                     stats.get("number_of_files", "N/A"),
                     ListBackups._format_size(stats.get("total_file_size", "N/A")),
                     ListBackups._format_duration(duration),
                 )
-            except (ValueError, AttributeError) as e:
+            except (ValueError, AttributeError, TypeError) as e:
                 logger.warning("Error processing backup data: %s", e)
-                table.add_row(backup.get("date", "Unknown"), "Error", "N/A", "N/A")
+                table.add_row(
+                    backup.get("date", "Unknown"),
+                    "Error",
+                    "N/A",
+                    "N/A",
+                    "N/A",
+                    "N/A",
+                )
 
     @staticmethod
     def _print_backup_summary(backups: List[Dict], console: Console) -> None:
@@ -135,7 +161,7 @@ class ListBackups(BaseCommand):
     def _format_size(size: str) -> str:
         """Format size in bytes to a human-readable format."""
         try:
-            size_bytes = float(size.split()[0].replace(",", ""))
+            size_bytes = float(size.replace(",", "").split()[0])
             for unit in ["B", "KB", "MB", "GB", "TB"]:
                 if size_bytes < 1024.0:
                     return f"{size_bytes:.2f} {unit}"

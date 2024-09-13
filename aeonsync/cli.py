@@ -103,28 +103,36 @@ def sync(
 def restore(
     ctx: typer.Context,
     file: Optional[Path] = typer.Argument(
-        None, help="File to restore (current directory if not specified)"
+        None, help="File or directory to restore (current directory if not specified)"
     ),
     date: Optional[str] = typer.Argument(None, help="Backup date to restore from"),
     output_dir: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Output directory for restored file"
+        None, "--output", "-o", help="Output directory for restored file or directory"
     ),
     interactive: bool = typer.Option(
         False, "--interactive", "-i", help="Use fully interactive mode for restore"
     ),
+    diff: bool = typer.Option(
+        False, "--diff", help="Show diff between local and backup versions"
+    ),
+    preview: bool = typer.Option(
+        False, "--preview", help="Show a preview of the file before restoring"
+    ),
 ):
-    """Restore a specific file from a backup."""
+    """Restore a specific file or directory from a backup."""
     try:
         # Use an empty list for sources, it will be populated with defaults in get_backup_config
         backup_config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
         aeonsync = AeonSync(backup_config)
 
         if interactive:
-            aeonsync.restore.restore_interactive()
+            aeonsync.restore.restore_interactive(diff=diff, preview=preview)
         else:
             if file is None:
                 file = Path.cwd()
-            aeonsync.restore.restore_file_versions(str(file), date, output_dir)
+            aeonsync.restore.restore_file_versions(
+                str(file), date, output_dir, diff=diff, preview=preview
+            )
 
     except Exception as e:
         logger.error("File restoration failed: %s", str(e), exc_info=True)
@@ -146,7 +154,7 @@ def list_backups(ctx: typer.Context):
 
 
 @app.command()
-def config(  # pylint: disable=too-many-arguments,too-many-branches
+def config( # pylint: disable=too-many-arguments,too-many-branches
     hostname: Optional[str] = typer.Option(None, help="Set the hostname"),
     remote_address: Optional[str] = typer.Option(None, help="Set the remote address"),
     remote_path: Optional[str] = typer.Option(None, help="Set the remote path"),
