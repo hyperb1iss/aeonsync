@@ -250,6 +250,11 @@ class AeonRestore(BaseCommand):
         """
         logger.debug("Selecting backup date")
         backups = self._get_available_backups()
+        if not backups:
+            logger.warning("No backups available to select.")
+            self.console.print("[red]No backups available to restore from.[/red]")
+            raise RuntimeError("No backups available.")
+
         table = Table(title="Available Backups")
         table.add_column("Date", style="cyan")
         for backup in backups:
@@ -378,12 +383,15 @@ class AeonRestore(BaseCommand):
             self.executor.rsync(source, temp_file_path)
             if preview:
                 # Preview
-                with open(temp_file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                    syntax = Syntax(content, "auto", line_numbers=True)
-                    self.console.print(
-                        Panel(syntax, title="File Preview", expand=False)
-                    )
+                try:
+                    with open(temp_file_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                        syntax = Syntax(content, "auto", line_numbers=True)
+                        self.console.print(
+                            Panel(syntax, title="File Preview", expand=False)
+                        )
+                except UnicodeDecodeError:
+                    self.console.print("[red]Cannot preview binary files.[/red]")
 
             if diff and Path(local_path).exists():
                 cmd = ["diff", local_path, temp_file_path]
@@ -530,6 +538,7 @@ class AeonRestore(BaseCommand):
             self.console.print(
                 f"[green]Successfully restored to: {restore_path}[/green]"
             )
+            self._log_restore_operation(backup_date, remote_relative_path, restore_path)
         except subprocess.CalledProcessError as e:
             logger.error("Failed to restore: %s", e)
             self.console.print(f"[red]Failed to restore: {e}[/red]")

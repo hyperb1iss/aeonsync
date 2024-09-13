@@ -1,22 +1,24 @@
+# pylint: disable=too-many-arguments,too-many-branches
 """Command-line interface for AeonSync."""
 
 import logging
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Sequence, Optional
 
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from aeonsync.config import (
+    config_manager,
+    BackupConfig,
     DEFAULT_REMOTE,
     DEFAULT_RETENTION_PERIOD,
     DEFAULT_SOURCE_DIRS,
-    BackupConfig,
-    config_manager,
 )
-from aeonsync.core import AeonSync
+from aeonsync.backup import AeonBackup
+from aeonsync.restore import AeonRestore
+from aeonsync.list import ListBackups
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
@@ -40,40 +42,24 @@ verbose_option = typer.Option(False, help="Enable verbose output")
 def get_backup_config(
     ctx: typer.Context, sources: Sequence[Path], retention: int, dry_run: bool
 ) -> BackupConfig:
-    """Create a BackupConfig instance from the context and command options.
-
-    Args:
-        ctx (typer.Context): Typer context object containing global options.
-        sources (Sequence[Path]): Source directories to backup.
-        retention (int): Number of days to retain backups.
-        dry_run (bool): Whether to perform a dry run.
-
-    Returns:
-        BackupConfig: Configured backup configuration.
-    """
+    """Create a BackupConfig instance from the context and command options."""
     if not sources:
         sources = [Path(s) for s in DEFAULT_SOURCE_DIRS]
+    # Convert the Sequence[Path] to list[str | Path]
+    sources_list: list[str | Path] = [
+        str(source) if isinstance(source, Path) else source for source in sources
+    ]
+
     return BackupConfig(
         remote=ctx.obj["remote"],
-        sources=list(sources),
+        sources=sources_list,
         ssh_key=ctx.obj["ssh_key"],
         remote_port=ctx.obj["port"],
         verbose=ctx.obj["verbose"],
         dry_run=dry_run,
         retention_period=retention,
+        log_file=ctx.obj.get("log_file"),
     )
-
-
-@dataclass
-class RestoreOptions:
-    """Dataclass to encapsulate restore command options."""
-
-    file: Optional[Path] = None
-    date: Optional[str] = None
-    output_dir: Optional[Path] = None
-    interactive: bool = False
-    diff: bool = False
-    preview: bool = False
 
 
 @app.callback()
@@ -83,22 +69,15 @@ def callback(
     ssh_key: Optional[Path] = ssh_key_option,
     port: Optional[int] = port_option,
     verbose: bool = verbose_option,
+    log_file: Optional[str] = typer.Option(None, help="Set the log file path"),
 ):
-    """
-    Common options for all commands.
-
-    Args:
-        ctx (typer.Context): Typer context object.
-        remote (str): Remote destination.
-        ssh_key (Optional[Path]): Path to SSH key.
-        port (Optional[int]): SSH port.
-        verbose (bool): Enable verbose logging.
-    """
+    """Common options for all commands."""
     ctx.ensure_object(dict)
     ctx.obj["remote"] = remote
     ctx.obj["ssh_key"] = ssh_key
     ctx.obj["port"] = port
     ctx.obj["verbose"] = verbose
+    ctx.obj["log_file"] = log_file
 
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
@@ -108,7 +87,7 @@ def callback(
 @app.command()
 def sync(
     ctx: typer.Context,
-    sources: List[Path] = typer.Option(
+    sources: Sequence[Path] = typer.Option(
         [Path(s) for s in DEFAULT_SOURCE_DIRS], help="Source directories to backup"
     ),
     retention: int = typer.Option(
@@ -121,9 +100,9 @@ def sync(
     """Create a backup of specified sources to the remote destination."""
     try:
         backup_config = get_backup_config(ctx, sources, retention, dry_run)
-        aeonsync = AeonSync(backup_config)
+        backup = AeonBackup(backup_config)
         with console.status("[bold green]Performing backup..."):
-            aeonsync.sync()
+            backup.create_backup()
         console.print("[bold green]Backup completed successfully.")
     except Exception as e:
         logger.error("Backup failed: %s", str(e), exc_info=True)
@@ -133,31 +112,45 @@ def sync(
 
 @app.command()
 def restore(
-    ctx: typer.Context,
-    options: RestoreOptions = typer.Option(
-        RestoreOptions(),
-        help="Options for restoring files or directories",
+    _: typer.Context,
+    file: Optional[Path] = typer.Argument(
+        None, help="File or directory to restore (current directory if not specified)"
+    ),
+    date: Optional[str] = typer.Argument(None, help="Backup date to restore from"),
+    output_dir: Optional[Path] = typer.Option(
+        None, "--output", "-o", help="Output directory for restored file or directory"
+    ),
+    interactive: bool = typer.Option(
+        False, "--interactive", "-i", help="Use fully interactive mode for restore"
+    ),
+    diff: bool = typer.Option(
+        False, "--diff", help="Show diff between local and backup versions"
+    ),
+    preview: bool = typer.Option(
+        False, "--preview", help="Show a preview of the file before restoring"
     ),
 ):
     """Restore a specific file or directory from a backup."""
     try:
-        # Use an empty list for sources, it will be populated with defaults in get_backup_config
-        backup_config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
-        aeonsync = AeonSync(backup_config)
+        backup_config = BackupConfig(
+            remote=config_manager.get("remote"),
+            sources=[],  # Sources are not required for restore
+            ssh_key=config_manager.get("ssh_key"),
+            remote_port=config_manager.get("remote_port"),
+            verbose=config_manager.get("verbose"),
+            dry_run=False,
+            retention_period=config_manager.get("retention_period"),
+            log_file=config_manager.get("log_file"),
+        )
+        restore_obj = AeonRestore(backup_config)
 
-        if options.interactive:
-            aeonsync.restore_obj.restore_interactive(
-                diff=options.diff, preview=options.preview
-            )
+        if interactive:
+            restore_obj.restore_interactive(diff=diff, preview=preview)
         else:
-            if options.file is None:
-                options.file = Path.cwd()
-            aeonsync.restore_obj.restore_file_versions(
-                str(options.file),
-                options.date,
-                options.output_dir,
-                diff=options.diff,
-                preview=options.preview,
+            if file is None:
+                file = Path.cwd()
+            restore_obj.restore_file_versions(
+                str(file), date, output_dir, diff=diff, preview=preview
             )
 
     except Exception as e:
@@ -167,12 +160,21 @@ def restore(
 
 
 @app.command()
-def list_backups(ctx: typer.Context):
+def list_backups(_: typer.Context):
     """List all available backups with their metadata."""
     try:
-        backup_config = get_backup_config(ctx, [], DEFAULT_RETENTION_PERIOD, False)
-        aeonsync = AeonSync(backup_config)
-        aeonsync.list_backups()
+        backup_config = BackupConfig(
+            remote=config_manager.get("remote"),
+            sources=[],  # Sources are not required for listing backups
+            ssh_key=config_manager.get("ssh_key"),
+            remote_port=config_manager.get("remote_port"),
+            verbose=config_manager.get("verbose"),
+            dry_run=False,
+            retention_period=config_manager.get("retention_period"),
+            log_file=config_manager.get("log_file"),
+        )
+        list_backups_obj = ListBackups(backup_config)
+        list_backups_obj.list()
     except Exception as e:
         logger.error("Failed to list backups: %s", str(e), exc_info=True)
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
@@ -180,7 +182,7 @@ def list_backups(ctx: typer.Context):
 
 
 @app.command()
-def config(  # pylint: disable=too-many-arguments,too-many-branches
+def config(
     hostname: Optional[str] = typer.Option(None, help="Set the hostname"),
     remote_address: Optional[str] = typer.Option(None, help="Set the remote address"),
     remote_path: Optional[str] = typer.Option(None, help="Set the remote path"),
@@ -252,12 +254,8 @@ def config(  # pylint: disable=too-many-arguments,too-many-branches
     show_config(config_manager.config)
 
 
-def show_config(config_dict: Dict[str, Any]):
-    """Display the current configuration.
-
-    Args:
-        config_dict (Dict[str, Any]): Configuration dictionary to display.
-    """
+def show_config(config_dict: dict):
+    """Display the current configuration."""
     table = Table(title="AeonSync Configuration")
     table.add_column("Setting", style="cyan")
     table.add_column("Value", style="green")
