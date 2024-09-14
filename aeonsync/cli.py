@@ -45,7 +45,9 @@ def validate_sources(sources: List[Path]):
     """Ensure all source directories exist."""
     for source in sources:
         if not source.exists() or not source.is_dir():
-            raise typer.BadParameter(f"Source directory does not exist or is not a directory: {source}")
+            raise typer.BadParameter(
+                f"Source directory does not exist or is not a directory: {source}"
+            )
 
 
 def get_backup_config(
@@ -53,7 +55,9 @@ def get_backup_config(
 ) -> BackupConfig:
     """Create a BackupConfig instance from the context and command options."""
     if not sources:
-        sources = [Path(s) for s in DEFAULT_SOURCE_DIRS]
+        sources = [
+            Path(s) for s in config_manager.get("source_dirs", DEFAULT_SOURCE_DIRS)
+        ]
     # Convert the List[Path] to list[str | Path]
     sources_list: list[str | Path] = [
         str(source) if isinstance(source, Path) else source for source in sources
@@ -152,15 +156,12 @@ def restore(
 ):
     """Restore a specific file or directory from a backup."""
     try:
-        backup_config = BackupConfig(
-            remote=ctx.obj["remote"],
-            sources=[],  # Sources are not required for restore
-            ssh_key=config_manager.get("ssh_key"),
-            remote_port=config_manager.get("remote_port"),
-            verbose=config_manager.get("verbose"),
-            dry_run=False,
-            retention_period=config_manager.get("retention_period"),
-            log_file=config_manager.get("log_file"),
+        sources = config_manager.get("source_dirs", DEFAULT_SOURCE_DIRS)
+        backup_config = get_backup_config(
+            ctx,
+            sources,
+            config_manager.get("retention_period", DEFAULT_RETENTION_PERIOD),
+            False,
         )
         restore_obj = AeonRestore(backup_config)
 

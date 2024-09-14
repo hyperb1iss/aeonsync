@@ -17,6 +17,27 @@ def aeon_restore(sample_config):
         return AeonRestore(sample_config)
 
 
+@pytest.fixture
+def create_aeon_restore():
+    """Fixture for creating an AeonRestore instance."""
+
+    def _create_aeon_restore(sources):
+        config = BackupConfig(
+            remote="user@host:/path",
+            sources=sources,
+            full=False,
+            dry_run=False,
+            ssh_key=None,
+            remote_port=None,
+            verbose=False,
+            retention_period=7,
+            log_file=None,
+        )
+        return AeonRestore(config)
+
+    return _create_aeon_restore
+
+
 def test_get_remote_relative_path(aeon_restore, sample_config):
     """Test the _get_remote_relative_path method."""
     # Create a new BackupConfig instance for testing
@@ -147,7 +168,6 @@ def test_log_restore_operation(mock_open, aeon_restore):
         mock_file.write.assert_called_once()
 
 
-
 @patch.object(Path, "is_file", return_value=True)
 @patch.object(AeonRestore, "_confirm_and_restore")
 @patch.object(AeonRestore, "_get_restore_path")
@@ -163,9 +183,10 @@ def test_restore_file_versions(
     mock_get_path,
     mock_confirm,
     _mock_is_file,
-    aeon_restore,
+    create_aeon_restore,
 ):
     """Test the restore_file_versions method for files."""
+    aeon_restore = create_aeon_restore(["/home/user"])
     mock_get_remote_relative_path.return_value = Path("file.txt")
     mock_get_versions.return_value = ["2023-01-03", "2023-01-02", "2023-01-01"]
     mock_select_version.return_value = "2023-01-02"
@@ -254,9 +275,10 @@ def test_restore_directory_versions(
     mock_confirm,
     _mock_is_dir,
     _mock_is_file,
-    aeon_restore,
+    create_aeon_restore,
 ):
     """Test the restore_file_versions method for directories."""
+    aeon_restore = create_aeon_restore(["/home/user"])
     mock_get_remote_relative_path.return_value = Path("documents")
     mock_get_versions.return_value = ["2023-01-03", "2023-01-02", "2023-01-01"]
     mock_select_version.return_value = "2023-01-02"
@@ -275,3 +297,27 @@ def test_restore_directory_versions(
     mock_confirm.assert_called_once_with(
         "2023-01-02", "documents", "/tmp/documents", is_directory=True
     )
+
+
+def test_get_remote_relative_path_no_sources(create_aeon_restore):
+    """Test the _get_remote_relative_path method when no sources are provided."""
+    aeon_restore = create_aeon_restore([])
+    result = aeon_restore._get_remote_relative_path(
+        Path("/home/user/documents/file.txt")
+    )
+    assert result is None
+
+
+def test_get_remote_relative_path_with_sources(create_aeon_restore):
+    """Test the _get_remote_relative_path method with valid sources."""
+    aeon_restore = create_aeon_restore(["/home/user", "/var/www"])
+    result = aeon_restore._get_remote_relative_path(
+        Path("/home/user/documents/file.txt")
+    )
+    assert result == Path("user/documents/file.txt")
+
+    result = aeon_restore._get_remote_relative_path(Path("/var/www/html/index.html"))
+    assert result == Path("www/html/index.html")
+
+    result = aeon_restore._get_remote_relative_path(Path("/etc/config.txt"))
+    assert result is None

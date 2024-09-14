@@ -39,6 +39,8 @@ class AeonRestore(BaseCommand):
         """
         super().__init__(config)
         self.console = Console()
+        if not self.config.sources:
+            logger.warning("No backup sources provided in the configuration.")
         logger.debug("AeonRestore initialized with config: %s", config)
 
     def restore_interactive(self, diff: bool = False, preview: bool = False) -> None:
@@ -229,6 +231,13 @@ class AeonRestore(BaseCommand):
         """
         logger.debug("Getting remote relative path for: %s", local_path)
         logger.debug("Backup sources: %s", self.config.sources)
+
+        if not self.config.sources:
+            logger.warning(
+                "No backup sources available. Unable to determine relative path."
+            )
+            return None
+
         for source in self.config.sources:
             source_path = Path(source).resolve()
             try:
