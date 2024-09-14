@@ -97,26 +97,14 @@ class ListBackups(BaseCommand):
             )
         else:
             try:
-                start_time_str = backup.get("start_time", "")
-                end_time_str = backup.get("end_time", "")
-                start_time = (
-                    datetime.fromisoformat(start_time_str)
-                    if start_time_str
-                    else None
-                )
-                end_time = datetime.fromisoformat(end_time_str) if end_time_str else None
-                duration = (
-                    end_time - start_time if start_time and end_time else timedelta()
-                )
+                start_time = datetime.fromisoformat(backup.get("start_time", ""))
+                duration = timedelta(seconds=float(backup.get("duration", 0)))
 
                 stats = backup.get("stats", {})
                 hostname = backup.get("hostname", "Unknown")
                 sources = ", ".join(backup.get("sources", []))
                 table.add_row(
-                    backup.get(
-                        "date",
-                        start_time.date().isoformat() if start_time else "Unknown",
-                    ),
+                    backup.get("date", start_time.date().isoformat()),
                     hostname,
                     sources,
                     stats.get("number_of_files", "N/A"),
@@ -169,9 +157,11 @@ class ListBackups(BaseCommand):
     @staticmethod
     def _format_duration(duration: timedelta) -> str:
         """Format timedelta to a human-readable format."""
-        seconds = duration.total_seconds()
-        if seconds < 60:
-            return f"{seconds:.2f}s"
-        if seconds < 3600:
-            return f"{seconds / 60:.2f}m"
-        return f"{seconds / 3600:.2f}h"
+        total_seconds = duration.total_seconds()
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 0:
+            return f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+        if minutes > 0:
+            return f"{int(minutes)}m {int(seconds)}s"
+        return f"{seconds:.2f}s"

@@ -90,10 +90,14 @@ class AeonBackup(BaseCommand):
     def _save_backup_metadata(self, rsync_output: str) -> None:
         """Save the backup metadata to a file in the backup directory."""
         logger.debug("Saving backup metadata")
+        start_time = datetime.now()
         stats = get_backup_stats(rsync_output)
+        end_time = datetime.now()
+        duration = end_time - start_time
         metadata = {
-            "start_time": datetime.now().isoformat(),
-            "end_time": datetime.now().isoformat(),
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "duration": duration.total_seconds(),
             "hostname": HOSTNAME,
             "sources": [str(s) for s in self.config.sources],
             "config": self._serialize_config(self.config._asdict()),
