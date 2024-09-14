@@ -27,6 +27,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 aeon = "aeonsync.cli:app"
+lint = "scripts.lint:run_lint"
 
 [tool.pytest.ini_options]
 addopts = "--cov=aeonsync --cov-report=term-missing"

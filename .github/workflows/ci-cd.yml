@@ -21,10 +21,8 @@ jobs:
       run: |
         pip install poetry
         poetry install
-    - name: Run mypy (type check)
-      run: poetry run mypy aeonsync tests
-    - name: Run pylint (linting)
-      run: poetry run pylint aeonsync tests
+    - name: Run lint checks
+      run: poetry run lint
     - name: Run tests
       run: poetry run pytest
     - name: Upload test results
