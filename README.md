@@ -8,73 +8,49 @@
 
 _A powerful and flexible remote backup tool for developers and system administrators_
 
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Configuration](#%EF%B8%8F-configuration) • [Development](#%EF%B8%8F-development) • [Contributing](#-contributing) • [License](#-license)
+[Key Features](#-key-features) • [Getting Started](#-getting-started) • [Usage](#-usage) • [Advanced Topics](#-advanced-topics) • [Contributing](#-contributing)
 
 </div>
 
-## ✨ Features
+## ✨ Key Features
 
-AeonSync offers a comprehensive set of features for efficient and secure remote backups:
+AeonSync redefines remote backups with its powerful feature set:
 
-- 🔄 **Incremental Backups**: Utilizes rsync's `--link-dest` for efficient storage management
-- 🔐 **Secure Remote Syncing**: Implements SSH for secure data transfer
-- ⏱️ **Customizable Retention Policies**: Automatically cleans up old backups based on user-defined policies
-- 🧪 **Dry-run Mode**: Test backups without making changes to ensure configuration accuracy
-- 📊 **Detailed Metadata Tracking**: Maintains comprehensive metadata for each backup operation
-- 🖥️ **User-friendly CLI**: Powered by Typer for an intuitive command-line interface
-- 🎨 **Rich Console Output**: Enhances readability with colorized and formatted output
-- 🔍 **Verbose Mode**: Provides detailed transfer logs for in-depth analysis
-- 🗂️ **Multiple Source Support**: Backup multiple directories in a single operation
-- 🔁 **Latest Backup Symlink**: Automatically creates a symlink to the most recent backup
-- 🕰️ **Version Selection**: Choose specific versions of files for restoration
-- 👀 **File Preview**: View file contents before restoration
-- 📊 **Diff Display**: Compare different versions of files
-- 🔄 **Interactive Restore**: User-friendly guided process for file recovery
-- 📜 **Comprehensive Backup Listing**: Detailed information about all available backups
-- ⚙️ **Flexible Configuration**: Easily customizable through command-line options or configuration file
+- 🔄 **Flexible Backup Modes**: Daily snapshots or multiple backups per day
+- 🔗 **Efficient Incremental Backups**: Leverages rsync's `--link-dest` for optimal storage use
+- 🔐 **Secure Remote Syncing**: Rock-solid SSH encryption for data transfer
+- ⏱️ **Smart Retention Policies**: Automatic management of your backup history
+- 🕰️ **Version Control**: Restore specific file versions with ease
+- 🖥️ **Intuitive CLI**: Seamless command-line experience powered by Typer
+- 📊 **Rich Metadata**: Comprehensive insights into each backup operation
 
-## 💻 Installation
+## 🚀 Getting Started
 
-### Prerequisites
+### Requirements
 
-- Python 3.12 or higher
-- SSH access to a remote server
-- rsync installed on both local and remote systems
+- Python 3.12+
+- SSH access to remote server/NAS
+- rsync on local and remote systems
 
-### Using pip
+### Installation
 
 ```bash
 pip install aeonsync
 ```
 
-### Using Poetry
+## 📘 Usage
+
+Basic command structure:
 
 ```bash
-git clone https://github.com/hyperb1iss/aeonsync.git
-cd aeonsync
-poetry install
-```
-
-After installation, the `aeon` command will be available in your system path.
-
-## 🚀 Usage
-
-AeonSync provides an intuitive command-line interface for easy interaction with your backup setup.
-
-### Basic Commands
-
-```bash
-# Perform a backup
+# Perform a backup (multiple per day by default)
 aeon sync --remote user@host:/path/to/backups
 
 # Restore a file
 aeon restore [OPTIONS] FILE [DATE]
 
 # List available backups
-aeon list-backups [OPTIONS]
-
-# Show help
-aeon --help
+aeon list-backups
 ```
 
 ### Sync Command
@@ -92,10 +68,11 @@ Options:
 - `--retention INTEGER`: Number of days to retain backups
 - `--dry-run`: Perform a dry run without making changes
 - `--verbose`: Enable verbose output
+- `--daily`: Create only one backup per day (overrides default behavior)
 
 ### Restore Command
 
-The restore command provides powerful functionality for file recovery:
+The restore command provides functionality for file recovery:
 
 ```bash
 aeon restore [OPTIONS] [FILE] [DATE]
@@ -118,61 +95,83 @@ aeon list-backups [OPTIONS]
 
 This command displays a detailed list of all backups, including dates, file counts, and total sizes.
 
-### Configuration Command
+## 🔧 Advanced Topics
 
-Manage AeonSync configuration:
-
-```bash
-aeon config [OPTIONS]
-```
-
-Options:
-
-- `--hostname TEXT`: Set the hostname
-- `--remote-address TEXT`: Set the remote address
-- `--remote-path TEXT`: Set the remote path
-- `--remote-port INTEGER`: Set the remote port
-- `--retention-period INTEGER`: Set the retention period in days
-- `--add-source-dir TEXT`: Add a source directory
-- `--remove-source-dir TEXT`: Remove a source directory
-- `--add-exclusion TEXT`: Add an exclusion pattern
-- `--remove-exclusion TEXT`: Remove an exclusion pattern
-- `--ssh-key TEXT`: Set the SSH key path
-- `--verbose`: Set verbose mode
-- `--log-file TEXT`: Set the log file path
-- `--show`: Show current configuration
-
-## ⚙️ Configuration
+### ⚙️ Configuration
 
 AeonSync can be configured using command-line options or by modifying the configuration file:
 
-- `hostname`: Hostname for the backup
-- `remote_address`: Remote server address
-- `remote_path`: Path on the remote server for backups
-- `remote_port`: SSH port for the remote server
-- `retention_period`: Number of days to keep backups
-- `source_dirs`: List of directories to back up
-- `exclusions`: Patterns to exclude from backups
-- `ssh_key`: Path to SSH key file
-- `verbose`: Enable verbose logging
-- `log_file`: Path to log file
-
-Example configuration:
-
 ```python
-hostname = "myhost"
-remote_address = "user@example.com"
-remote_path = "/backups"
+hostname = "myworkstation"
+remote_address = "user@nas.local"
+remote_path = "/volume1/backups"
 remote_port = 22
 retention_period = 30
-source_dirs = ["/home/user", "/var/www"]
-exclusions = [".cache", "*/node_modules", "*.tmp"]
+source_dirs = ["/home/user/projects", "/var/www", "/etc"]
+exclusions = [".cache", "*/node_modules", "*.tmp", ".venv"]
 ssh_key = "/home/user/.ssh/id_rsa"
 verbose = False
 log_file = "/home/user/.local/share/aeonsync/aeonsync.log"
+default_daily_backup = False  # Set to True to allow only one backup per day
 ```
 
-## 🛠️ Development
+### 📁 Remote Structure
+
+AeonSync organizes your backups as follows:
+
+```
+/volume1/backups/
+└── myworkstation/
+    ├── latest -> 2024-03-15
+    ├── 2024-03-15/
+    ├── 2024-03-14/
+    ├── 2024-03-13.1/
+    ├── 2024-03-13/
+    └── ...
+```
+
+- Each backup is stored in a date-stamped directory
+- Multiple backups per day append a sequence number (e.g., `2024-03-13.1`)
+- The `latest` symlink always points to the most recent backup
+
+### 🌟 Use Cases
+
+AeonSync can be used in various scenarios:
+
+#### Home Office Backup
+
+Protect your projects and documents with daily backups to your Synology NAS:
+
+```bash
+aeon sync --remote user@synology:/volume1/backups --source /home/user/projects --source /home/user/documents
+```
+
+#### Web Server Backup
+
+Safeguard your web applications and databases:
+
+```bash
+aeon sync --remote backupuser@remote-server:/backups --source /var/www --source /var/lib/mysql
+```
+
+#### Developer Workstation
+
+Keep your code safe with multiple backups per day:
+
+```bash
+aeon sync --remote user@dev-server:/backups --source /home/dev/workspace
+```
+
+#### Small Business Server
+
+Comprehensive backup solution for critical business data:
+
+```bash
+aeon config --hostname business-server --remote-address nas.local --remote-path /volume1/business-backups
+aeon sync --source /home/shared --source /var/financial-data --retention 90
+```
+
+### 🛠️ Development
 
 To set up the development environment:
 
