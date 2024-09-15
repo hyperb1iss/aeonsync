@@ -1,3 +1,5 @@
+# tests/test_cli.py
+
 # pylint: disable=redefined-outer-name
 """Test cases for the AeonSync CLI functionality."""
 
@@ -16,6 +18,7 @@ runner = CliRunner()
 def mock_config_manager():
     """Fixture for mocking the config manager."""
     with patch("aeonsync.cli.config_manager") as mock:
+        mock.get.return_value = None  # Default to None unless specified
         yield mock
 
 
@@ -40,20 +43,38 @@ def mock_list_backups():
         yield mock
 
 
-def test_sync_command(mock_aeon_backup):
+def test_sync_command(mock_aeon_backup, mock_config_manager):
     """Test the basic sync command without options."""
+    mock_config_manager.get.return_value = False  # default_daily_backup = False
     result = runner.invoke(app, ["sync"])
     assert result.exit_code == 0
     mock_aeon_backup.assert_called_once()
-    mock_aeon_backup.return_value.create_backup.assert_called_once()
+    args, _ = mock_aeon_backup.call_args
+    config = args[0]
+    assert isinstance(config, BackupConfig)
+    assert config.daily is False
+
+
+def test_sync_command_with_daily_flag(mock_aeon_backup):
+    """Test the sync command with the --daily flag."""
+    result = runner.invoke(app, ["sync", "--daily"])
+    assert result.exit_code == 0
+    mock_aeon_backup.assert_called_once()
+    args, _ = mock_aeon_backup.call_args
+    config = args[0]
+    assert isinstance(config, BackupConfig)
+    assert config.daily is True
 
 
 @patch("aeonsync.cli.Path.exists")
 @patch("aeonsync.cli.Path.is_dir")
-def test_sync_command_with_options(mock_is_dir, mock_exists, mock_aeon_backup):
+def test_sync_command_with_options(
+    mock_is_dir, mock_exists, mock_aeon_backup, mock_config_manager
+):
     """Test the sync command with various options."""
     mock_exists.return_value = True
     mock_is_dir.return_value = True
+    mock_config_manager.get.return_value = False  # default_daily_backup = False
     result = runner.invoke(
         app, ["sync", "--source", "/test/path", "--retention", "30", "--dry-run"]
     )
@@ -67,6 +88,21 @@ def test_sync_command_with_options(mock_is_dir, mock_exists, mock_aeon_backup):
     assert "/test/path" in config.sources
     assert config.retention_period == 30
     assert config.dry_run is True
+    assert config.daily is False  # default value
+
+
+def test_sync_command_with_default_daily_backup(mock_aeon_backup, mock_config_manager):
+    """Test the sync command when default_daily_backup is set in config."""
+    mock_config_manager.get.side_effect = (
+        lambda key, default: True if key == "default_daily_backup" else default
+    )
+    result = runner.invoke(app, ["sync"])
+    assert result.exit_code == 0
+    mock_aeon_backup.assert_called_once()
+    args, _ = mock_aeon_backup.call_args
+    config = args[0]
+    assert isinstance(config, BackupConfig)
+    assert config.daily is True
 
 
 def test_restore_command(mock_aeon_restore):
@@ -89,8 +125,9 @@ def test_restore_command_interactive(mock_aeon_restore):
     )
 
 
-def test_list_backups_command(mock_list_backups):
+def test_list_backups_command(mock_list_backups, mock_config_manager):
     """Test the list-backups command."""
+    mock_config_manager.get.return_value = None
     result = runner.invoke(app, ["list-backups"])
     assert result.exit_code == 0
     mock_list_backups.assert_called_once()
@@ -111,6 +148,20 @@ def test_config_command_set(mock_config_manager):
     result = runner.invoke(app, ["config", "--hostname", "new_host"])
     assert result.exit_code == 0
     mock_config_manager.set.assert_called_once_with("hostname", "new_host")
+
+
+def test_config_command_set_default_daily_backup(mock_config_manager):
+    """Test enabling the default_daily_backup flag."""
+    result = runner.invoke(app, ["config", "--default-daily-backup"])
+    assert result.exit_code == 0
+    mock_config_manager.set.assert_called_with("default_daily_backup", True)
+
+
+def test_config_command_disable_default_daily_backup(mock_config_manager):
+    """Test disabling the default_daily_backup flag."""
+    result = runner.invoke(app, ["config", "--no-default-daily-backup"])
+    assert result.exit_code == 0
+    mock_config_manager.set.assert_called_with("default_daily_backup", False)
 
 
 def test_config_command_add_source_dir(mock_config_manager):

@@ -1,6 +1,3 @@
-# aeonsync/cli.py
-
-# pylint: disable=too-many-arguments,too-many-branches
 """Command-line interface for AeonSync."""
 
 import logging
@@ -38,7 +35,7 @@ remote_option = typer.Option(
 )
 ssh_key_option = typer.Option(None, help="Path to SSH private key for authentication")
 port_option = typer.Option(None, help="Remote SSH port")
-verbose_option = typer.Option(False, help="Enable verbose output")
+verbose_option = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 
 
 def validate_sources(sources: List[Path]):
@@ -51,7 +48,11 @@ def validate_sources(sources: List[Path]):
 
 
 def get_backup_config(
-    ctx: typer.Context, sources: List[Path], retention: int, dry_run: bool
+    ctx: typer.Context,
+    sources: List[Path],
+    retention: int,
+    dry_run: bool,
+    daily: Optional[bool],
 ) -> BackupConfig:
     """Create a BackupConfig instance from the context and command options."""
     if not sources:
@@ -62,7 +63,11 @@ def get_backup_config(
     sources_list: list[str | Path] = [
         str(source) if isinstance(source, Path) else source for source in sources
     ]
-
+    daily = (
+        daily
+        if daily is not None
+        else config_manager.get("default_daily_backup", False)
+    )
     return BackupConfig(
         remote=ctx.obj["remote"],
         sources=sources_list,
@@ -71,6 +76,7 @@ def get_backup_config(
         verbose=ctx.obj["verbose"],
         dry_run=dry_run,
         retention_period=retention,
+        daily=daily,
         log_file=ctx.obj.get("log_file"),
     )
 
@@ -115,11 +121,16 @@ def sync(
     dry_run: bool = typer.Option(
         False, help="Perform a dry run without making changes"
     ),
+    daily: Optional[bool] = typer.Option(
+        None,
+        "--daily",
+        help="Only create one backup per day (old behavior)",
+    ),
 ):
     """Create a backup of specified sources to the remote destination."""
     try:
         validate_sources(sources)
-        backup_config = get_backup_config(ctx, sources, retention, dry_run)
+        backup_config = get_backup_config(ctx, sources, retention, dry_run, daily)
         backup = AeonBackup(backup_config)
         with console.status("[bold green]Performing backup..."):
             backup.create_backup()
@@ -162,6 +173,7 @@ def restore(
             sources,
             config_manager.get("retention_period", DEFAULT_RETENTION_PERIOD),
             False,
+            daily=None,  # daily not relevant for restore
         )
         restore_obj = AeonRestore(backup_config)
 
@@ -195,6 +207,7 @@ def list_backups(ctx: typer.Context):
             verbose=config_manager.get("verbose"),
             dry_run=False,
             retention_period=config_manager.get("retention_period"),
+            daily=config_manager.get("default_daily_backup", False),
             log_file=config_manager.get("log_file"),
         )
         list_backups_obj = ListBackups(backup_config)
@@ -208,7 +221,7 @@ def list_backups(ctx: typer.Context):
         console.print(f"[bold red]Error:[/bold red] {str(e)}")
         raise typer.Exit(code=1)
 
-
+# pylint: disable=too-many-branches
 @app.command()
 def config(
     hostname: Optional[str] = typer.Option(None, help="Set the hostname"),
@@ -229,6 +242,11 @@ def config(
     ssh_key: Optional[str] = typer.Option(None, help="Set the SSH key path"),
     verbose: Optional[bool] = typer.Option(None, help="Set verbose mode"),
     log_file: Optional[str] = typer.Option(None, help="Set the log file path"),
+    default_daily_backup: Optional[bool] = typer.Option(
+        None,
+        "--default-daily-backup/--no-default-daily-backup",
+        help="Enable or disable daily backups as the default behavior",
+    ),
     show: bool = typer.Option(False, "--show", help="Show current configuration"),
 ):
     """View or edit the AeonSync configuration."""
@@ -272,6 +290,9 @@ def config(
         changed = True
     if log_file is not None:
         config_manager.set("log_file", log_file)
+        changed = True
+    if default_daily_backup is not None:
+        config_manager.set("default_daily_backup", default_daily_backup)
         changed = True
 
     if changed:

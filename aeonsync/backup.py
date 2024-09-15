@@ -4,12 +4,12 @@ import json
 import logging
 from datetime import datetime
 import subprocess
-from typing import List, Any
+from typing import List, Any, Optional
 from pathlib import Path, PosixPath
 
 from aeonsync import BaseCommand
 from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS, BackupConfig
-from aeonsync.utils import get_backup_stats
+from aeonsync.utils import RemoteExecutor, get_backup_stats
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AeonBackup(BaseCommand):
     """Handles backup operations for AeonSync."""
 
-    def __init__(self, config: BackupConfig):
+    def __init__(self, config: BackupConfig, executor: Optional[RemoteExecutor] = None):
         """
         Initialize AeonBackup with the provided configuration.
 
@@ -26,7 +26,16 @@ class AeonBackup(BaseCommand):
         """
         super().__init__(config)
         self.date = datetime.now().strftime("%Y-%m-%d")
-        self.backup_path = f"{self.remote_info.path}/{HOSTNAME}/{self.date}"
+        self.executor = executor or RemoteExecutor(
+            self.remote_info,
+            self.config.ssh_key,
+            self.config.remote_port,
+        )
+        if self.config.daily:
+            self.backup_name = self.date
+        else:
+            self.backup_name = self._get_next_backup_name()
+        self.backup_path = f"{self.remote_info.path}/{HOSTNAME}/{self.backup_name}"
         self.latest_link = f"{self.remote_info.path}/{HOSTNAME}/latest"
 
     def create_backup(self) -> None:
@@ -106,6 +115,33 @@ class AeonBackup(BaseCommand):
         self.executor.run_command(
             f"echo '{json.dumps(metadata, indent=2)}' > {self.backup_path}/{METADATA_FILE_NAME}"
         )
+
+    def _get_next_backup_name(self) -> str:
+        """Generate the next backup name with an incrementing sequence number."""
+        cmd = f"ls -1 {self.remote_info.path}/{HOSTNAME}"
+        try:
+            result = self.executor.run_command(cmd)
+            backups = []
+            for line in result.stdout.strip().split("\n"):
+                if line.startswith(self.date):
+                    backups.append(line)
+            if not backups:
+                return self.date
+            # Find the highest sequence number
+            max_seq = 0
+            for backup in backups:
+                if backup == self.date:
+                    seq = 0
+                else:
+                    parts = backup.split(".")
+                    if len(parts) == 2 and parts[0] == self.date and parts[1].isdigit():
+                        seq = int(parts[1])
+                        max_seq = max(max_seq, seq)
+            next_seq = max_seq + 1
+            return f"{self.date}.{next_seq}"
+        except subprocess.CalledProcessError:
+            # If the directory doesn't exist, start with the date
+            return self.date
 
     @staticmethod
     def _serialize_config(config: Any) -> Any:

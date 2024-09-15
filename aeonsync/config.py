@@ -63,6 +63,7 @@ class ConfigManager:
             "log_file": str(
                 Path.home() / ".local" / "share" / self.APP_NAME / "aeonsync.log"
             ),
+            "default_daily_backup": False,
         }
 
     def load_config(self) -> None:
@@ -169,3 +170,4 @@ class BackupConfig(NamedTuple):
     verbose: bool = VERBOSE
     retention_period: int = DEFAULT_RETENTION_PERIOD
     log_file: Optional[str] = LOG_FILE
+    daily: bool = False
