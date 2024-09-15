@@ -75,7 +75,7 @@ class AeonBackup(BaseCommand):
         for exclusion in EXCLUSIONS:
             extra_args.extend(["--exclude", exclusion])
         if not self.config.full:
-            extra_args.extend(["--link-dest", f"../{HOSTNAME}/latest"])
+            extra_args.extend(["--link-dest", "../latest"])
         if self.config.dry_run:
             extra_args.append("--dry-run")
         if self.config.verbose:
