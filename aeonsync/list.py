@@ -61,7 +61,7 @@ class ListBackups(BaseCommand):
                         backups.append(backup_data)
                     except json.JSONDecodeError:
                         logger.warning(
-                            f"Failed to parse JSON data for backup {current_backup}"
+                            "Failed to parse JSON data for backup %s", current_backup
                         )
                 current_backup = None
                 current_json = ""
@@ -152,7 +152,7 @@ class ListBackups(BaseCommand):
         for unit in ["B", "KB", "MB", "GB", "TB"]:
             if size_bytes < 1024.0:
                 return f"{size_bytes:.2f} {unit}"
-            size_bytes /= 1024.0
+            size_bytes = int(size_bytes / 1024.0)
         return f"{size_bytes:.2f} PB"
 
     @staticmethod

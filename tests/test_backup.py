@@ -1,18 +1,19 @@
-# pylint: disable=protected-access
+# pylint: disable=protected-access, redefined-outer-name
 
 """Test cases for AeonBackup functionality."""
 
 import subprocess
-from unittest.mock import MagicMock, patch
-import pytest
 from datetime import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from aeonsync.backup import AeonBackup
-from aeonsync.utils import RemoteExecutor
 
 
 @pytest.fixture
 def mock_executor():
+    """Fixture to mock RemoteExecutor."""
     with patch("aeonsync.backup.RemoteExecutor", autospec=True) as mock:
         executor = mock.return_value
         executor.run_command = MagicMock()
@@ -22,6 +23,7 @@ def mock_executor():
 
 @pytest.fixture
 def aeon_backup(sample_config, mock_executor):
+    """Fixture to create an AeonBackup instance with mocked datetime."""
     with patch("aeonsync.backup.datetime") as mock_datetime:
         mock_datetime.now.return_value = datetime(2024, 9, 15)
         return AeonBackup(sample_config, executor=mock_executor)
