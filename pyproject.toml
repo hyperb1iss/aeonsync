@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aeonsync"
-version = "0.1.0"
+version = "0.2.0"
 description = "A simple but powerful rsync backup tool"
 authors = ["Stefanie Jane <stef@hyperbliss.tech>"]
 license = "GPLv3"
