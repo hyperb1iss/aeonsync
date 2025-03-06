@@ -7,18 +7,34 @@ import sys
 
 
 def run_lint():
-    """Run linting checks on the project using pylint and mypy."""
+    """Run linting checks on the project using ruff, pylint, and mypy."""
     print("Running linting checks...")
 
-    pylint_result = subprocess.run(
-        ["pylint", "aeonsync", "tests", "scripts"],
+    # Run Ruff (primary linter)
+    ruff_result = subprocess.run(
+        ["uv", "run", "ruff", "check", "."],
         capture_output=True,
         text=True,
         check=False,
     )
-    mypy_result = subprocess.run(
-        ["mypy", "aeonsync"], capture_output=True, text=True, check=False
+
+    # Run Pylint (for checks not covered by Ruff)
+    pylint_result = subprocess.run(
+        ["uv", "run", "pylint", "aeonsync", "tests", "scripts"],
+        capture_output=True,
+        text=True,
+        check=False,
     )
+
+    # Run Mypy (type checking)
+    mypy_result = subprocess.run(["uv", "run", "mypy", "aeonsync"], capture_output=True, text=True, check=False)
+
+    # Report results
+    if ruff_result.returncode != 0:
+        print("Ruff issues found:")
+        print(ruff_result.stdout)
+    else:
+        print("Ruff checks passed.")
 
     if pylint_result.returncode != 0:
         print("Pylint issues found:")
@@ -32,10 +48,11 @@ def run_lint():
     else:
         print("Mypy checks passed.")
 
-    if pylint_result.returncode != 0 or mypy_result.returncode != 0:
+    # Exit with error if any checks failed
+    if ruff_result.returncode != 0 or pylint_result.returncode != 0 or mypy_result.returncode != 0:
         sys.exit(1)
 
-    print("All linting checks passed!")
+    print("All linting checks passed! ✨")
     sys.exit(0)
 
 

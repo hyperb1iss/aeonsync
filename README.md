@@ -31,9 +31,16 @@ AeonSync redefines remote backups with its powerful feature set:
 - Python 3.12+
 - SSH access to remote server/NAS
 - rsync on local and remote systems
+- [uv](https://github.com/astral-sh/uv) (recommended) or pip
 
 ### Installation
 
+With UV (recommended):
+```bash
+uv pip install aeonsync
+```
+
+With pip:
 ```bash
 pip install aeonsync
 ```
@@ -180,20 +187,35 @@ To set up the development environment:
    git clone https://github.com/hyperb1iss/aeonsync.git
    cd aeonsync
    ```
-2. Install Poetry if you haven't already: `pip install poetry`
-3. Install dependencies: `poetry install`
-4. Activate the virtual environment: `poetry shell`
+
+2. Install UV if you haven't already: 
+   ```bash
+   curl -LsS https://astral.sh/uv/install.sh | bash
+   ```
+
+3. Create development environment and install dependencies:
+   ```bash
+   uv venv
+   uv sync
+   ```
+
+4. Activate the virtual environment:
+   ```bash
+   source .venv/bin/activate  # On Linux/macOS
+   .venv\Scripts\activate     # On Windows
+   ```
 
 To run tests:
 
 ```bash
-pytest
+uv run pytest
 ```
 
 To run linting checks:
 
 ```bash
-poetry run lint
+uv run ruff check .
+uv run mypy .
 ```
 
 ## 👥 Contributing
