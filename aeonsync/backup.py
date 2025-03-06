@@ -1,14 +1,14 @@
 """Backup functionality for AeonSync."""
 
+from datetime import datetime
 import json
 import logging
-from datetime import datetime
-import subprocess
-from typing import List, Any, Optional
 from pathlib import Path, PosixPath
+import subprocess
+from typing import Any
 
 from aeonsync import BaseCommand
-from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, EXCLUSIONS, BackupConfig
+from aeonsync.config import EXCLUSIONS, HOSTNAME, METADATA_FILE_NAME, BackupConfig
 from aeonsync.utils import RemoteExecutor, get_backup_stats
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class AeonBackup(BaseCommand):
     """Handles backup operations for AeonSync."""
 
-    def __init__(self, config: BackupConfig, executor: Optional[RemoteExecutor] = None):
+    def __init__(self, config: BackupConfig, executor: RemoteExecutor | None = None):
         """
         Initialize AeonBackup with the provided configuration.
 
@@ -60,9 +60,7 @@ class AeonBackup(BaseCommand):
         """Perform the actual backup using rsync."""
         extra_args = self._build_rsync_extra_args()
         source = str(self.config.sources[0])  # Assuming single source for simplicity
-        destination = (
-            f"{self.remote_info.user}@{self.remote_info.host}:{self.backup_path}"
-        )
+        destination = f"{self.remote_info.user}@{self.remote_info.host}:{self.backup_path}"
 
         try:
             result = self.executor.rsync(source, destination, extra_args)
@@ -75,10 +73,10 @@ class AeonBackup(BaseCommand):
 
             return result.stdout
         except subprocess.CalledProcessError as e:
-            logger.error("Rsync command failed: %s", e.stderr)
+            logger.exception("Rsync command failed: %s", e.stderr)
             raise
 
-    def _build_rsync_extra_args(self) -> List[str]:
+    def _build_rsync_extra_args(self) -> list[str]:
         """Build extra arguments for the rsync command."""
         extra_args = ["--delete", "--stats"]
         for exclusion in EXCLUSIONS:
@@ -112,9 +110,7 @@ class AeonBackup(BaseCommand):
             "config": self._serialize_config(self.config._asdict()),
             "stats": stats,
         }
-        self.executor.run_command(
-            f"echo '{json.dumps(metadata, indent=2)}' > {self.backup_path}/{METADATA_FILE_NAME}"
-        )
+        self.executor.run_command(f"echo '{json.dumps(metadata, indent=2)}' > {self.backup_path}/{METADATA_FILE_NAME}")
 
     def _get_next_backup_name(self) -> str:
         """Generate the next backup name with an incrementing sequence number."""
@@ -146,7 +142,7 @@ class AeonBackup(BaseCommand):
     @staticmethod
     def _serialize_config(config: Any) -> Any:
         """Recursively serialize config to ensure JSON compatibility."""
-        if isinstance(config, (Path, PosixPath)):
+        if isinstance(config, Path | PosixPath):
             return str(config)
         if isinstance(config, dict):
             return {k: AeonBackup._serialize_config(v) for k, v in config.items()}

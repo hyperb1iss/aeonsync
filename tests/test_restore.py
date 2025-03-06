@@ -1,13 +1,14 @@
 # pylint: disable=protected-access, redefined-outer-name, too-many-arguments, unused-argument
 """Test cases for AeonRestore functionality."""
 
-import subprocess
 from pathlib import Path
-from unittest.mock import Mock, patch, call
+import subprocess
+from unittest.mock import Mock, call, patch
+
 import pytest
 
-from aeonsync.restore import AeonRestore
 from aeonsync.config import BackupConfig
+from aeonsync.restore import AeonRestore
 
 
 @pytest.fixture
@@ -55,23 +56,18 @@ def test_get_remote_relative_path(aeon_restore, sample_config):
     aeon_restore.config = test_config
 
     # Test file within backup source
-    assert aeon_restore._get_remote_relative_path(
-        Path("/home/user/documents/file.txt")
-    ) == Path("user/documents/file.txt")
-    assert aeon_restore._get_remote_relative_path(
-        Path("/home/user/photos/image.jpg")
-    ) == Path("user/photos/image.jpg")
+    assert aeon_restore._get_remote_relative_path(Path("/home/user/documents/file.txt")) == Path(
+        "user/documents/file.txt"
+    )
+    assert aeon_restore._get_remote_relative_path(Path("/home/user/photos/image.jpg")) == Path("user/photos/image.jpg")
 
     # Test file in subdirectory
-    assert aeon_restore._get_remote_relative_path(
-        Path("/home/user/documents/subfolder/file.txt")
-    ) == Path("user/documents/subfolder/file.txt")
+    assert aeon_restore._get_remote_relative_path(Path("/home/user/documents/subfolder/file.txt")) == Path(
+        "user/documents/subfolder/file.txt"
+    )
 
     # Test file not in backup source
-    assert (
-        aeon_restore._get_remote_relative_path(Path("/home/other_user/music/song.mp3"))
-        is None
-    )
+    assert aeon_restore._get_remote_relative_path(Path("/home/other_user/music/song.mp3")) is None
 
     # Test with multiple sources
     test_config = BackupConfig(
@@ -87,9 +83,7 @@ def test_get_remote_relative_path(aeon_restore, sample_config):
     )
     aeon_restore.config = test_config
 
-    assert aeon_restore._get_remote_relative_path(
-        Path("/var/www/html/index.html")
-    ) == Path("www/html/index.html")
+    assert aeon_restore._get_remote_relative_path(Path("/var/www/html/index.html")) == Path("www/html/index.html")
 
 
 def test_get_path_versions(aeon_restore):
@@ -137,9 +131,7 @@ def test_get_restore_path(mock_prompt, aeon_restore):
     assert restore_path == "/tmp/restored_file.txt"
 
     # Test with output_dir
-    restore_path = aeon_restore._get_restore_path(
-        Path("/home/user/documents/file.txt"), Path("/tmp")
-    )
+    restore_path = aeon_restore._get_restore_path(Path("/home/user/documents/file.txt"), Path("/tmp"))
     assert restore_path == "/tmp/file.txt"
 
 
@@ -162,9 +154,7 @@ def test_get_restore_path_existing_file(mock_prompt, mock_exists, aeon_restore):
 def test_log_restore_operation(mock_open, aeon_restore):
     """Test the logging of restore operations."""
     with mock_open() as mock_file:
-        aeon_restore._log_restore_operation(
-            "2023-01-01", "file.txt", "/tmp/restored_file.txt"
-        )
+        aeon_restore._log_restore_operation("2023-01-01", "file.txt", "/tmp/restored_file.txt")
         mock_file.write.assert_called_once()
 
 
@@ -192,17 +182,11 @@ def test_restore_file_versions(
     mock_select_version.return_value = "2023-01-02"
     mock_get_path.return_value = "/tmp/restored_file.txt"
 
-    aeon_restore.restore_file_versions(
-        "/home/user/documents/file.txt", diff=True, preview=True
-    )
+    aeon_restore.restore_file_versions("/home/user/documents/file.txt", diff=True, preview=True)
 
-    mock_get_remote_relative_path.assert_called_once_with(
-        Path("/home/user/documents/file.txt")
-    )
+    mock_get_remote_relative_path.assert_called_once_with(Path("/home/user/documents/file.txt"))
     mock_get_versions.assert_called_once_with(Path("file.txt"))
-    mock_select_version.assert_called_once_with(
-        ["2023-01-03", "2023-01-02", "2023-01-01"]
-    )
+    mock_select_version.assert_called_once_with(["2023-01-03", "2023-01-02", "2023-01-01"])
     mock_preview_and_diff.assert_called_once_with(
         "2023-01-02",
         "file.txt",
@@ -211,17 +195,13 @@ def test_restore_file_versions(
         preview=True,
     )
     mock_get_path.assert_called_once_with(Path("/home/user/documents/file.txt"), None)
-    mock_confirm.assert_called_once_with(
-        "2023-01-02", "file.txt", "/tmp/restored_file.txt", is_directory=False
-    )
+    mock_confirm.assert_called_once_with("2023-01-02", "file.txt", "/tmp/restored_file.txt", is_directory=False)
 
 
 def test_get_file_info(aeon_restore):
     """Test the _get_file_info method."""
     with patch.object(aeon_restore.executor, "run_command") as mock_run:
-        mock_run.return_value.stdout = (
-            "1024 1609459200\n"
-        )  # 1KB file, Jan 1, 2021 00:00:00 UTC
+        mock_run.return_value.stdout = "1024 1609459200\n"  # 1KB file, Jan 1, 2021 00:00:00 UTC
         file_info = aeon_restore._get_file_info("2023-01-01", "file.txt")
         assert file_info["size"] == "1.00 KB"
         assert file_info["mtime"] == "2021-01-01 00:00:00 UTC"
@@ -245,9 +225,7 @@ def test_show_restore_summary(aeon_restore):
                 "size": "1.00 KB",
                 "mtime": "2021-01-01 00:00:00 UTC",
             }
-            aeon_restore._show_restore_summary(
-                "2023-01-01", "file.txt", "/tmp/restored_file.txt"
-            )
+            aeon_restore._show_restore_summary("2023-01-01", "file.txt", "/tmp/restored_file.txt")
             mock_table_class.assert_called_once()
 
             expected_calls = [
@@ -284,36 +262,26 @@ def test_restore_directory_versions(
     mock_select_version.return_value = "2023-01-02"
     mock_get_path.return_value = "/tmp/documents"
 
-    aeon_restore.restore_file_versions(
-        "/home/user/documents", diff=False, preview=False
-    )
+    aeon_restore.restore_file_versions("/home/user/documents", diff=False, preview=False)
 
     mock_get_remote_relative_path.assert_called_once_with(Path("/home/user/documents"))
     mock_get_versions.assert_called_once_with(Path("documents"))
-    mock_select_version.assert_called_once_with(
-        ["2023-01-03", "2023-01-02", "2023-01-01"]
-    )
+    mock_select_version.assert_called_once_with(["2023-01-03", "2023-01-02", "2023-01-01"])
     mock_get_path.assert_called_once_with(Path("/home/user/documents"), None)
-    mock_confirm.assert_called_once_with(
-        "2023-01-02", "documents", "/tmp/documents", is_directory=True
-    )
+    mock_confirm.assert_called_once_with("2023-01-02", "documents", "/tmp/documents", is_directory=True)
 
 
 def test_get_remote_relative_path_no_sources(create_aeon_restore):
     """Test the _get_remote_relative_path method when no sources are provided."""
     aeon_restore = create_aeon_restore([])
-    result = aeon_restore._get_remote_relative_path(
-        Path("/home/user/documents/file.txt")
-    )
+    result = aeon_restore._get_remote_relative_path(Path("/home/user/documents/file.txt"))
     assert result is None
 
 
 def test_get_remote_relative_path_with_sources(create_aeon_restore):
     """Test the _get_remote_relative_path method with valid sources."""
     aeon_restore = create_aeon_restore(["/home/user", "/var/www"])
-    result = aeon_restore._get_remote_relative_path(
-        Path("/home/user/documents/file.txt")
-    )
+    result = aeon_restore._get_remote_relative_path(Path("/home/user/documents/file.txt"))
     assert result == Path("user/documents/file.txt")
 
     result = aeon_restore._get_remote_relative_path(Path("/var/www/html/index.html"))

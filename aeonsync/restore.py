@@ -6,20 +6,19 @@ for the AeonSync backup system. It includes functionality for interactive restor
 file version selection, and non-interactive restores.
 """
 
-import os
+from datetime import UTC, datetime
 import logging
-import subprocess
-from typing import List, Optional, Dict
-from datetime import datetime, timezone
+import os
 from pathlib import Path
+import subprocess
 from tempfile import NamedTemporaryFile
 
-from rich.console import Console
-from rich.table import Table
-from rich.syntax import Syntax
-from rich.panel import Panel
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import PathCompleter
+from rich.console import Console
+from rich.panel import Panel
+from rich.syntax import Syntax
+from rich.table import Table
 
 from aeonsync import BaseCommand
 from aeonsync.config import HOSTNAME, BackupConfig
@@ -79,14 +78,10 @@ class AeonRestore(BaseCommand):
                     preview=preview,
                 )
             restore_path = self._get_restore_path(local_path)
-            self._confirm_and_restore(
-                backup_date, str(remote_relative_path), restore_path, is_directory=False
-            )
+            self._confirm_and_restore(backup_date, str(remote_relative_path), restore_path, is_directory=False)
         elif local_path.is_dir():
             restore_path = self._get_restore_path(local_path)
-            self._confirm_and_restore(
-                backup_date, str(remote_relative_path), restore_path, is_directory=True
-            )
+            self._confirm_and_restore(backup_date, str(remote_relative_path), restore_path, is_directory=True)
         else:
             logger.warning("Invalid path selected: %s", path_to_restore)
             self.console.print(f"[red]Invalid path: {path_to_restore}[/red]")
@@ -94,8 +89,8 @@ class AeonRestore(BaseCommand):
     def restore_file_versions(
         self,
         file_path: str,
-        specific_date: Optional[str] = None,
-        output_dir: Optional[Path] = None,
+        specific_date: str | None = None,
+        output_dir: Path | None = None,
         diff: bool = False,
         preview: bool = False,
     ) -> None:
@@ -120,9 +115,7 @@ class AeonRestore(BaseCommand):
                 "Path '%s' is not within any of the backup source directories",
                 file_path,
             )
-            self.console.print(
-                f"[yellow]'{file_path}' is not within any of the backup source directories.[/yellow]"
-            )
+            self.console.print(f"[yellow]'{file_path}' is not within any of the backup source directories.[/yellow]")
             return
 
         available_versions = self._get_path_versions(remote_relative_path)
@@ -135,9 +128,7 @@ class AeonRestore(BaseCommand):
         if specific_date:
             if specific_date not in available_versions:
                 logger.warning("No backup found for date: %s", specific_date)
-                self.console.print(
-                    f"[yellow]No backup found for date '{specific_date}'[/yellow]"
-                )
+                self.console.print(f"[yellow]No backup found for date '{specific_date}'[/yellow]")
                 return
             selected_version = specific_date
         else:
@@ -179,7 +170,7 @@ class AeonRestore(BaseCommand):
         self,
         backup_date: str,
         file_path: str,
-        restore_path: Optional[str] = None,
+        restore_path: str | None = None,
         is_directory: bool = False,
     ) -> None:
         """
@@ -191,9 +182,7 @@ class AeonRestore(BaseCommand):
             restore_path (Optional[str]): Custom path to restore to
             is_directory (bool): Whether the path is a directory
         """
-        logger.debug(
-            "Starting restore_file for date: %s, path: %s", backup_date, file_path
-        )
+        logger.debug("Starting restore_file for date: %s, path: %s", backup_date, file_path)
         local_path = Path(file_path).resolve()
         remote_relative_path = self._get_remote_relative_path(local_path)
         if not remote_relative_path:
@@ -201,25 +190,19 @@ class AeonRestore(BaseCommand):
                 "Path '%s' is not within any of the backup source directories",
                 file_path,
             )
-            self.console.print(
-                f"[yellow]'{file_path}' is not within any of the backup source directories.[/yellow]"
-            )
+            self.console.print(f"[yellow]'{file_path}' is not within any of the backup source directories.[/yellow]")
             return
 
         if not self._path_exists_in_backup(backup_date, str(remote_relative_path)):
             logger.warning("Path not found in backup dated %s", backup_date)
-            self.console.print(
-                f"[red]Path not found in the backup dated {backup_date}.[/red]"
-            )
+            self.console.print(f"[red]Path not found in the backup dated {backup_date}.[/red]")
             return
 
         restore_path = restore_path or file_path
         logger.debug("Restore path: %s", restore_path)
-        self._perform_restore(
-            backup_date, str(remote_relative_path), restore_path, is_directory
-        )
+        self._perform_restore(backup_date, str(remote_relative_path), restore_path, is_directory)
 
-    def _get_remote_relative_path(self, local_path: Path) -> Optional[Path]:
+    def _get_remote_relative_path(self, local_path: Path) -> Path | None:
         """
         Get the relative path of the file or directory in the remote backup.
 
@@ -233,9 +216,7 @@ class AeonRestore(BaseCommand):
         logger.debug("Backup sources: %s", self.config.sources)
 
         if not self.config.sources:
-            logger.warning(
-                "No backup sources available. Unable to determine relative path."
-            )
+            logger.warning("No backup sources available. Unable to determine relative path.")
             return None
 
         for source in self.config.sources:
@@ -276,11 +257,9 @@ class AeonRestore(BaseCommand):
                 logger.debug("Selected backup date: %s", date)
                 return date
             logger.warning("Invalid date selected: %s", date)
-            self.console.print(
-                "[red]Invalid date. Please choose from the list above.[/red]"
-            )
+            self.console.print("[red]Invalid date. Please choose from the list above.[/red]")
 
-    def _get_available_backups(self) -> List[Dict[str, str]]:
+    def _get_available_backups(self) -> list[dict[str, str]]:
         """
         Fetch available backups.
 
@@ -318,19 +297,13 @@ class AeonRestore(BaseCommand):
                 completer=PathCompleter(),
             )
             remote_relative_path = self._get_remote_relative_path(Path(path))
-            if remote_relative_path and self._path_exists_in_backup(
-                backup_date, str(remote_relative_path)
-            ):
+            if remote_relative_path and self._path_exists_in_backup(backup_date, str(remote_relative_path)):
                 logger.debug("Selected path: %s", path)
                 return path
             logger.warning("Path not found in backup: %s", path)
-            self.console.print(
-                "[red]Path not found in the backup. Please try again.[/red]"
-            )
+            self.console.print("[red]Path not found in the backup. Please try again.[/red]")
 
-    def _path_exists_in_backup(
-        self, backup_date: str, remote_relative_path: str
-    ) -> bool:
+    def _path_exists_in_backup(self, backup_date: str, remote_relative_path: str) -> bool:
         """
         Check if the path exists in the specified backup.
 
@@ -353,7 +326,7 @@ class AeonRestore(BaseCommand):
             logger.debug("Path exists: %s", exists)
             return exists
         except subprocess.CalledProcessError as e:
-            logger.error("Error checking path existence: %s", e)
+            logger.exception("Error checking path existence: %s", e)
             return False
 
     def _preview_and_diff(
@@ -380,9 +353,7 @@ class AeonRestore(BaseCommand):
             remote_relative_path,
             local_path,
         )
-        remote_file_path = (
-            f"{self.remote_info.path}/{HOSTNAME}/{backup_date}/{remote_relative_path}"
-        )
+        remote_file_path = f"{self.remote_info.path}/{HOSTNAME}/{backup_date}/{remote_relative_path}"
         source = f"{self.remote_info.user}@{self.remote_info.host}:{remote_file_path}"
 
         with NamedTemporaryFile(delete=False) as temp_file:
@@ -393,40 +364,28 @@ class AeonRestore(BaseCommand):
             if preview:
                 # Preview
                 try:
-                    with open(temp_file_path, "r", encoding="utf-8") as f:
+                    with open(temp_file_path, encoding="utf-8") as f:
                         content = f.read()
                         syntax = Syntax(content, "auto", line_numbers=True)
-                        self.console.print(
-                            Panel(syntax, title="File Preview", expand=False)
-                        )
+                        self.console.print(Panel(syntax, title="File Preview", expand=False))
                 except UnicodeDecodeError:
                     self.console.print("[red]Cannot preview binary files.[/red]")
 
             if diff and Path(local_path).exists():
                 cmd = ["diff", local_path, temp_file_path]
-                result = subprocess.run(
-                    cmd, capture_output=True, text=True, check=False
-                )
+                result = subprocess.run(cmd, capture_output=True, text=True, check=False)
                 if result.stdout:
                     syntax = Syntax(result.stdout, "diff", line_numbers=True)
-                    self.console.print(
-                        Panel(syntax, title="Diff with current version", expand=False)
-                    )
+                    self.console.print(Panel(syntax, title="Diff with current version", expand=False))
                 else:
-                    self.console.print(
-                        "[green]The file is identical to the current version.[/green]"
-                    )
+                    self.console.print("[green]The file is identical to the current version.[/green]")
             elif diff:
-                self.console.print(
-                    "[yellow]The file doesn't exist locally. No diff available.[/yellow]"
-                )
+                self.console.print("[yellow]The file doesn't exist locally. No diff available.[/yellow]")
         finally:
             # Clean up the temporary file
             os.remove(temp_file_path)
 
-    def _get_restore_path(
-        self, original_path: Path, output_dir: Optional[Path] = None
-    ) -> str:
+    def _get_restore_path(self, original_path: Path, output_dir: Path | None = None) -> str:
         """
         Determine the restore path based on the original path and output directory.
 
@@ -456,17 +415,12 @@ class AeonRestore(BaseCommand):
             )
             if (
                 not os.path.exists(restore_path)
-                or prompt(
-                    f"[yellow]'{restore_path}' already exists. Overwrite? (y/n): [/yellow]"
-                ).lower()
-                == "y"
+                or prompt(f"[yellow]'{restore_path}' already exists. Overwrite? (y/n): [/yellow]").lower() == "y"
             ):
                 logger.debug("Final restore path: %s", restore_path)
                 return restore_path
             logger.debug("User chose not to overwrite existing path")
-            self.console.print(
-                "[red]Please choose a different path or confirm overwrite.[/red]"
-            )
+            self.console.print("[red]Please choose a different path or confirm overwrite.[/red]")
 
     def _confirm_and_restore(
         self,
@@ -502,9 +456,7 @@ class AeonRestore(BaseCommand):
             self.console.print("[yellow]Restore operation cancelled.[/yellow]")
             return
 
-        self._perform_restore(
-            backup_date, remote_relative_path, restore_path, is_directory
-        )
+        self._perform_restore(backup_date, remote_relative_path, restore_path, is_directory)
 
     def _perform_restore(
         self,
@@ -529,9 +481,7 @@ class AeonRestore(BaseCommand):
             restore_path,
             is_directory,
         )
-        remote_path = (
-            f"{self.remote_info.path}/{HOSTNAME}/{backup_date}/{remote_relative_path}"
-        )
+        remote_path = f"{self.remote_info.path}/{HOSTNAME}/{backup_date}/{remote_relative_path}"
         source = f"{self.remote_info.user}@{self.remote_info.host}:{remote_path}"
 
         try:
@@ -544,15 +494,13 @@ class AeonRestore(BaseCommand):
 
             self.executor.rsync(source, restore_path, extra_args)
             logger.info("Successfully restored to: %s", restore_path)
-            self.console.print(
-                f"[green]Successfully restored to: {restore_path}[/green]"
-            )
+            self.console.print(f"[green]Successfully restored to: {restore_path}[/green]")
             self._log_restore_operation(backup_date, remote_relative_path, restore_path)
         except subprocess.CalledProcessError as e:
-            logger.error("Failed to restore: %s", e)
+            logger.exception("Failed to restore: %s", e)
             self.console.print(f"[red]Failed to restore: {e}[/red]")
 
-    def _get_path_versions(self, remote_relative_path: Path) -> List[str]:
+    def _get_path_versions(self, remote_relative_path: Path) -> list[str]:
         """
         Get available versions of a path from backups.
 
@@ -573,7 +521,7 @@ class AeonRestore(BaseCommand):
         logger.debug("Found %d versions", len(versions))
         return sorted(versions, reverse=True)
 
-    def _select_version(self, versions: List[str]) -> str:
+    def _select_version(self, versions: list[str]) -> str:
         """
         Let the user select a version from the list.
 
@@ -596,13 +544,9 @@ class AeonRestore(BaseCommand):
                 logger.debug("Selected version: %s", selected)
                 return selected
             logger.warning("Invalid version selected: %s", selected)
-            self.console.print(
-                "[red]Invalid date. Please choose from the list above.[/red]"
-            )
+            self.console.print("[red]Invalid date. Please choose from the list above.[/red]")
 
-    def _get_file_info(
-        self, backup_date: str, remote_relative_path: str
-    ) -> Dict[str, str]:
+    def _get_file_info(self, backup_date: str, remote_relative_path: str) -> dict[str, str]:
         """
         Get file information from a specific backup.
 
@@ -613,13 +557,11 @@ class AeonRestore(BaseCommand):
         Returns:
             Dict[str, str]: File information including size and modification time
         """
-        logger.debug(
-            "Getting file info: date=%s, path=%s", backup_date, remote_relative_path
-        )
+        logger.debug("Getting file info: date=%s, path=%s", backup_date, remote_relative_path)
         cmd = f"stat -c '%s %Y' {self.remote_info.path}/{HOSTNAME}/{backup_date}/{remote_relative_path}"
         result = self.executor.run_command(cmd)
         size, mtime = result.stdout.strip().split()
-        mtime_utc = datetime.fromtimestamp(int(mtime), tz=timezone.utc)
+        mtime_utc = datetime.fromtimestamp(int(mtime), tz=UTC)
         info = {
             "size": self._format_size(int(size)),
             "mtime": mtime_utc.strftime("%Y-%m-%d %H:%M:%S %Z"),
@@ -645,9 +587,7 @@ class AeonRestore(BaseCommand):
             size /= 1024.0
         return f"{size:.2f} PB"
 
-    def _show_restore_summary(
-        self, backup_date: str, remote_relative_path: str, restore_path: str
-    ) -> None:
+    def _show_restore_summary(self, backup_date: str, remote_relative_path: str, restore_path: str) -> None:
         """
         Show a summary of the restore operation.
 
@@ -690,9 +630,7 @@ class AeonRestore(BaseCommand):
         if not os.path.exists(restore_path):
             return True
 
-        self.console.print(
-            f"[yellow]Warning: '{restore_path}' already exists.[/yellow]"
-        )
+        self.console.print(f"[yellow]Warning: '{restore_path}' already exists.[/yellow]")
         choice = prompt("Choose an action (o)verwrite, (r)ename, (s)kip: ").lower()
 
         if choice == "o":
@@ -701,9 +639,7 @@ class AeonRestore(BaseCommand):
         if choice == "r":
             new_path = prompt("Enter a new file name: ")
             logger.debug("User chose to rename, new path: %s", new_path)
-            return self._handle_restore_conflict(
-                os.path.join(os.path.dirname(restore_path), new_path)
-            )
+            return self._handle_restore_conflict(os.path.join(os.path.dirname(restore_path), new_path))
         if choice == "s":
             logger.debug("User chose to skip restore")
             self.console.print("[yellow]Skipping restore operation.[/yellow]")
@@ -713,9 +649,7 @@ class AeonRestore(BaseCommand):
         self.console.print("[red]Invalid choice. Please try again.[/red]")
         return self._handle_restore_conflict(restore_path)
 
-    def _log_restore_operation(
-        self, backup_date: str, remote_relative_path: str, restore_path: str
-    ) -> None:
+    def _log_restore_operation(self, backup_date: str, remote_relative_path: str, restore_path: str) -> None:
         """
         Log the restore operation for auditing purposes.
 

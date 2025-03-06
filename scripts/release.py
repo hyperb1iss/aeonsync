@@ -9,7 +9,6 @@ import re
 import shutil
 import subprocess
 import sys
-from typing import List, Tuple
 
 from colorama import Style, init
 from wcwidth import wcswidth
@@ -46,7 +45,6 @@ GRADIENT_COLORS = [
 
 def print_colored(message: str, color: str) -> None:
     """Print a message with a specific color."""
-    print(f"{color}{message}{COLOR_RESET}")
 
 
 def print_step(step: str) -> None:
@@ -69,7 +67,7 @@ def print_warning(message: str) -> None:
     print_colored(f"⚠️  {message}", COLOR_WARNING)
 
 
-def generate_gradient(colors: List[Tuple[int, int, int]], steps: int) -> List[str]:
+def generate_gradient(colors: list[tuple[int, int, int]], steps: int) -> list[str]:
     """Generate a list of color codes for a smooth multi-color gradient."""
     gradient = []
     segments = len(colors) - 1
@@ -94,12 +92,9 @@ def strip_ansi(text: str) -> str:
     return ansi_escape.sub("", text)
 
 
-def apply_gradient(text: str, gradient: List[str], line_number: int) -> str:
+def apply_gradient(text: str, gradient: list[str], line_number: int) -> str:
     """Apply gradient colors diagonally to text."""
-    return "".join(
-        f"{gradient[(i + line_number) % len(gradient)]}{char}"
-        for i, char in enumerate(text)
-    )
+    return "".join(f"{gradient[(i + line_number) % len(gradient)]}{char}" for i, char in enumerate(text))
 
 
 def center_text(text: str, width: int) -> str:
@@ -109,7 +104,7 @@ def center_text(text: str, width: int) -> str:
     return f"{' ' * padding}{text}{' ' * (width - padding - visible_length)}"
 
 
-def center_block(block: List[str], width: int) -> List[str]:
+def center_block(block: list[str], width: int) -> list[str]:
     """Center a block of text within a given width."""
     return [center_text(line, width) for line in block]
 
@@ -133,9 +128,7 @@ def create_banner() -> str:
     centered_logo = center_block(logo, content_width)
 
     banner = [
-        center_text(
-            f"{COLOR_STAR}･ ｡ ☆ ∴｡　　･ﾟ*｡★･ ∴｡　　･ﾟ*｡☆ ･ ｡ ☆ ∴｡", banner_width
-        ),
+        center_text(f"{COLOR_STAR}･ ｡ ☆ ∴｡　　･ﾟ*｡★･ ∴｡　　･ﾟ*｡☆ ･ ｡ ☆ ∴｡", banner_width),
         f"{COLOR_BORDER}╭{'─' * (banner_width - 2)}╮",
     ]
 
@@ -152,9 +145,7 @@ def create_banner() -> str:
                 f"{COLOR_STAR}∴｡　　･ﾟ*｡☆ {release_manager_text}{COLOR_STAR} ☆｡*ﾟ･　 ｡∴",
                 banner_width,
             ),
-            center_text(
-                f"{COLOR_STAR}･ ｡ ☆ ∴｡　　･ﾟ*｡★･ ∴｡　　･ﾟ*｡☆ ･ ｡ ☆ ∴｡", banner_width
-            ),
+            center_text(f"{COLOR_STAR}･ ｡ ☆ ∴｡　　･ﾟ*｡★･ ∴｡　　･ﾟ*｡☆ ･ ｡ ☆ ∴｡", banner_width),
         ]
     )
 
@@ -163,7 +154,6 @@ def create_banner() -> str:
 
 def print_logo() -> None:
     """Print the banner/logo for the release manager."""
-    print(create_banner())
 
 
 def check_tool_installed(tool_name: str) -> None:
@@ -175,11 +165,7 @@ def check_tool_installed(tool_name: str) -> None:
 
 def check_branch() -> None:
     """Ensure we're on the main branch."""
-    current_branch = (
-        subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-        .decode()
-        .strip()
-    )
+    current_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
     if current_branch != "main":
         print_error("You must be on the main branch to release.")
         sys.exit(1)
@@ -193,17 +179,13 @@ def check_uncommitted_changes() -> None:
         check=False,
     )
     if result.returncode != 0:
-        print_error(
-            "You have uncommitted changes. Please commit or stash them before releasing."
-        )
+        print_error("You have uncommitted changes. Please commit or stash them before releasing.")
         sys.exit(1)
 
 
 def get_current_version() -> str:
     """Get the current version from pyproject.toml."""
-    result = subprocess.run(
-        ["poetry", "version", "-s"], capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["poetry", "version", "-s"], capture_output=True, text=True, check=True)
     return result.stdout.strip()
 
 
@@ -217,11 +199,9 @@ def update_docs_version(current_version: str, new_version: str) -> None:
     """Update documentation version."""
     docs_path = "README.md"
     if os.path.exists(docs_path):
-        with open(docs_path, "r", encoding="utf-8") as f:
+        with open(docs_path, encoding="utf-8") as f:
             content = f.read()
-        updated_content = content.replace(
-            f"version {current_version}", f"version {new_version}"
-        )
+        updated_content = content.replace(f"version {current_version}", f"version {new_version}")
         with open(docs_path, "w", encoding="utf-8") as f:
             f.write(updated_content)
         print_success(f"Updated version in {docs_path} to {new_version}")
@@ -244,15 +224,13 @@ def commit_and_push(version: str) -> None:
     print_step("Committing and pushing changes")
     try:
         subprocess.run(["git", "add", "pyproject.toml", "README.md"], check=True)
-        subprocess.run(
-            ["git", "commit", "-m", f":rocket: Release version {version}"], check=True
-        )
+        subprocess.run(["git", "commit", "-m", f":rocket: Release version {version}"], check=True)
         subprocess.run(["git", "push"], check=True)
         subprocess.run(["git", "tag", f"v{version}"], check=True)
         subprocess.run(["git", "push", "--tags"], check=True)
         print_success(f"Changes committed and pushed for version {version}")
     except subprocess.CalledProcessError as e:
-        print_error(f"Git operations failed: {str(e)}")
+        print_error(f"Git operations failed: {e!s}")
         sys.exit(1)
 
 
@@ -278,9 +256,7 @@ def main() -> None:
     )
 
     if not is_valid_version(new_version):
-        print_error(
-            "Invalid version format. Please use semantic versioning (e.g., 1.2.3)."
-        )
+        print_error("Invalid version format. Please use semantic versioning (e.g., 1.2.3).")
         sys.exit(1)
 
     update_version(new_version)
@@ -292,9 +268,7 @@ def main() -> None:
 
     commit_and_push(new_version)
 
-    print_success(
-        f"\n🎉✨ {PROJECT_NAME} v{new_version} has been successfully released! ✨🎉"
-    )
+    print_success(f"\n🎉✨ {PROJECT_NAME} v{new_version} has been successfully released! ✨🎉")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,11 @@
 """Configuration module for AeonSync."""
 
-import socket
-from typing import List, NamedTuple, Optional, Union, Dict, Any
 from pathlib import Path
+import socket
+from typing import Any, NamedTuple
 
-import toml
 from appdirs import user_config_dir
+import toml
 
 
 class ConfigManager:
@@ -14,7 +14,7 @@ class ConfigManager:
     APP_NAME = "aeonsync"
     CONFIG_FILE_NAME = "config.toml"
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Path | None = None):
         """
         Initialize ConfigManager with the specified configuration directory.
 
@@ -24,11 +24,11 @@ class ConfigManager:
         """
         self.config_dir = config_dir or Path(user_config_dir(self.APP_NAME))
         self.config_file_path = self.config_dir / self.CONFIG_FILE_NAME
-        self.config: Dict[str, Any] = {}  # Initialize config as an empty dict
+        self.config: dict[str, Any] = {}  # Initialize config as an empty dict
         self.load_config()  # Load the configuration
 
     @property
-    def default_config(self) -> Dict[str, Any]:
+    def default_config(self) -> dict[str, Any]:
         """Provide default configuration values.
 
         Returns:
@@ -60,9 +60,7 @@ class ConfigManager:
             ],
             "ssh_key": str(Path.home() / ".ssh" / "id_rsa"),
             "verbose": False,
-            "log_file": str(
-                Path.home() / ".local" / "share" / self.APP_NAME / "aeonsync.log"
-            ),
+            "log_file": str(Path.home() / ".local" / "share" / self.APP_NAME / "aeonsync.log"),
             "default_daily_backup": False,
         }
 
@@ -70,14 +68,14 @@ class ConfigManager:
         """Load the configuration from file or create with default values if it doesn't exist."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         if self.config_file_path.exists():
-            with open(self.config_file_path, "r", encoding="utf-8") as config_file:
+            with open(self.config_file_path, encoding="utf-8") as config_file:
                 self.config = toml.load(config_file)
         else:
             # If the config file doesn't exist, use default values
             self.config = self.default_config.copy()
             self.save_config(self.config)
 
-    def save_config(self, new_config: Dict[str, Any]) -> None:
+    def save_config(self, new_config: dict[str, Any]) -> None:
         """
         Save the configuration to file.
 
@@ -145,13 +143,11 @@ config_manager = ConfigManager()
 
 # Expose configuration values as module-level variables
 HOSTNAME = config_manager.get("hostname")
-DEFAULT_REMOTE = (
-    f"{config_manager.get('remote_address')}:{config_manager.get('remote_path')}"
-)
+DEFAULT_REMOTE = f"{config_manager.get('remote_address')}:{config_manager.get('remote_path')}"
 DEFAULT_RETENTION_PERIOD = config_manager.get("retention_period")
 METADATA_FILE_NAME = "backup_metadata.json"
-DEFAULT_SOURCE_DIRS: List[str] = config_manager.get("source_dirs")
-EXCLUSIONS: List[str] = config_manager.get("exclusions")
+DEFAULT_SOURCE_DIRS: list[str] = config_manager.get("source_dirs")
+EXCLUSIONS: list[str] = config_manager.get("exclusions")
 DEFAULT_SSH_KEY = config_manager.get("ssh_key")
 DEFAULT_REMOTE_PORT = config_manager.get("remote_port")
 VERBOSE = config_manager.get("verbose")
@@ -162,12 +158,12 @@ class BackupConfig(NamedTuple):
     """Configuration for backup operations."""
 
     remote: str
-    sources: List[Union[str, Path]]
+    sources: list[str | Path]
     full: bool = False
     dry_run: bool = False
-    ssh_key: Optional[str] = DEFAULT_SSH_KEY
-    remote_port: Optional[int] = DEFAULT_REMOTE_PORT
+    ssh_key: str | None = DEFAULT_SSH_KEY
+    remote_port: int | None = DEFAULT_REMOTE_PORT
     verbose: bool = VERBOSE
     retention_period: int = DEFAULT_RETENTION_PERIOD
-    log_file: Optional[str] = LOG_FILE
+    log_file: str | None = LOG_FILE
     daily: bool = False

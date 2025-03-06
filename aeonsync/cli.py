@@ -2,22 +2,21 @@
 
 import logging
 from pathlib import Path
-from typing import List, Optional
 
-import typer
 from rich.console import Console
 from rich.table import Table
+import typer
 
+from aeonsync.backup import AeonBackup
 from aeonsync.config import (
-    config_manager,
-    BackupConfig,
     DEFAULT_REMOTE,
     DEFAULT_RETENTION_PERIOD,
     DEFAULT_SOURCE_DIRS,
+    BackupConfig,
+    config_manager,
 )
-from aeonsync.backup import AeonBackup
-from aeonsync.restore import AeonRestore
 from aeonsync.list import ListBackups
+from aeonsync.restore import AeonRestore
 
 # Set up logging
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s: %(message)s")
@@ -30,44 +29,32 @@ app = typer.Typer()
 console = Console()
 
 # Common options
-remote_option = typer.Option(
-    DEFAULT_REMOTE, help="Remote destination in the format [user@]host:path"
-)
+remote_option = typer.Option(DEFAULT_REMOTE, help="Remote destination in the format [user@]host:path")
 ssh_key_option = typer.Option(None, help="Path to SSH private key for authentication")
 port_option = typer.Option(None, help="Remote SSH port")
 verbose_option = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 
 
-def validate_sources(sources: List[Path]):
+def validate_sources(sources: list[Path]):
     """Ensure all source directories exist."""
     for source in sources:
         if not source.exists() or not source.is_dir():
-            raise typer.BadParameter(
-                f"Source directory does not exist or is not a directory: {source}"
-            )
+            raise typer.BadParameter(f"Source directory does not exist or is not a directory: {source}")
 
 
 def get_backup_config(
     ctx: typer.Context,
-    sources: List[Path],
+    sources: list[Path],
     retention: int,
     dry_run: bool,
-    daily: Optional[bool],
+    daily: bool | None,
 ) -> BackupConfig:
     """Create a BackupConfig instance from the context and command options."""
     if not sources:
-        sources = [
-            Path(s) for s in config_manager.get("source_dirs", DEFAULT_SOURCE_DIRS)
-        ]
+        sources = [Path(s) for s in config_manager.get("source_dirs", DEFAULT_SOURCE_DIRS)]
     # Convert the List[Path] to list[str | Path]
-    sources_list: list[str | Path] = [
-        str(source) if isinstance(source, Path) else source for source in sources
-    ]
-    daily = (
-        daily
-        if daily is not None
-        else config_manager.get("default_daily_backup", False)
-    )
+    sources_list: list[str | Path] = [str(source) if isinstance(source, Path) else source for source in sources]
+    daily = daily if daily is not None else config_manager.get("default_daily_backup", False)
     return BackupConfig(
         remote=ctx.obj["remote"],
         sources=sources_list,
@@ -85,10 +72,10 @@ def get_backup_config(
 def callback(
     ctx: typer.Context,
     remote: str = remote_option,
-    ssh_key: Optional[Path] = ssh_key_option,
-    port: Optional[int] = port_option,
+    ssh_key: Path | None = ssh_key_option,
+    port: int | None = port_option,
     verbose: bool = verbose_option,
-    log_file: Optional[str] = typer.Option(None, help="Set the log file path"),
+    log_file: str | None = typer.Option(None, help="Set the log file path"),
 ):
     """Common options for all commands."""
     ctx.ensure_object(dict)
@@ -108,20 +95,16 @@ def callback(
 @app.command()
 def sync(
     ctx: typer.Context,
-    sources: List[Path] = typer.Option(
+    sources: list[Path] = typer.Option(
         DEFAULT_SOURCE_DIRS,
         "--source",
         "-s",
         help="Source directories to backup. Can be specified multiple times.",
         show_default=True,
     ),
-    retention: int = typer.Option(
-        DEFAULT_RETENTION_PERIOD, help="Number of days to retain backups"
-    ),
-    dry_run: bool = typer.Option(
-        False, help="Perform a dry run without making changes"
-    ),
-    daily: Optional[bool] = typer.Option(
+    retention: int = typer.Option(DEFAULT_RETENTION_PERIOD, help="Number of days to retain backups"),
+    dry_run: bool = typer.Option(False, help="Perform a dry run without making changes"),
+    daily: bool | None = typer.Option(
         None,
         "--daily",
         help="Only create one backup per day (old behavior)",
@@ -136,34 +119,28 @@ def sync(
             backup.create_backup()
         console.print("[bold green]Backup completed successfully.")
     except typer.BadParameter as e:
-        logger.error("Invalid parameter: %s", str(e))
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        logger.exception("Invalid parameter: %s", str(e))
+        console.print(f"[bold red]Error:[/bold red] {e!s}")
         raise typer.Exit(code=1)
     except Exception as e:
         logger.error("Backup failed: %s", str(e), exc_info=True)
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {e!s}")
         raise typer.Exit(code=1)
 
 
 @app.command()
 def restore(
     ctx: typer.Context,
-    file: Optional[Path] = typer.Argument(
+    file: Path | None = typer.Argument(
         None, help="File or directory to restore (current directory if not specified)"
     ),
-    date: Optional[str] = typer.Argument(None, help="Backup date to restore from"),
-    output_dir: Optional[Path] = typer.Option(
+    date: str | None = typer.Argument(None, help="Backup date to restore from"),
+    output_dir: Path | None = typer.Option(
         None, "--output", "-o", help="Output directory for restored file or directory"
     ),
-    interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Use fully interactive mode for restore"
-    ),
-    diff: bool = typer.Option(
-        False, "--diff", help="Show diff between local and backup versions"
-    ),
-    preview: bool = typer.Option(
-        False, "--preview", help="Show a preview of the file before restoring"
-    ),
+    interactive: bool = typer.Option(False, "--interactive", "-i", help="Use fully interactive mode for restore"),
+    diff: bool = typer.Option(False, "--diff", help="Show diff between local and backup versions"),
+    preview: bool = typer.Option(False, "--preview", help="Show a preview of the file before restoring"),
 ):
     """Restore a specific file or directory from a backup."""
     try:
@@ -182,13 +159,11 @@ def restore(
         else:
             if file is None:
                 file = Path.cwd()
-            restore_obj.restore_file_versions(
-                str(file), date, output_dir, diff=diff, preview=preview
-            )
+            restore_obj.restore_file_versions(str(file), date, output_dir, diff=diff, preview=preview)
 
     except Exception as e:
         logger.error("File restoration failed: %s", str(e), exc_info=True)
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {e!s}")
         raise typer.Exit(code=1)
 
 
@@ -213,36 +188,31 @@ def list_backups(ctx: typer.Context):
         list_backups_obj = ListBackups(backup_config)
         list_backups_obj.list()
     except typer.BadParameter as e:
-        logger.error("Invalid parameter: %s", str(e))
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        logger.exception("Invalid parameter: %s", str(e))
+        console.print(f"[bold red]Error:[/bold red] {e!s}")
         raise typer.Exit(code=1)
     except Exception as e:
         logger.error("Failed to list backups: %s", str(e), exc_info=True)
-        console.print(f"[bold red]Error:[/bold red] {str(e)}")
+        console.print(f"[bold red]Error:[/bold red] {e!s}")
         raise typer.Exit(code=1)
+
 
 # pylint: disable=too-many-branches
 @app.command()
 def config(
-    hostname: Optional[str] = typer.Option(None, help="Set the hostname"),
-    remote_address: Optional[str] = typer.Option(None, help="Set the remote address"),
-    remote_path: Optional[str] = typer.Option(None, help="Set the remote path"),
-    remote_port: Optional[int] = typer.Option(None, help="Set the remote port"),
-    retention_period: Optional[int] = typer.Option(
-        None, help="Set the retention period in days"
-    ),
-    add_source_dir: Optional[str] = typer.Option(None, help="Add a source directory"),
-    remove_source_dir: Optional[str] = typer.Option(
-        None, help="Remove a source directory"
-    ),
-    add_exclusion: Optional[str] = typer.Option(None, help="Add an exclusion pattern"),
-    remove_exclusion: Optional[str] = typer.Option(
-        None, help="Remove an exclusion pattern"
-    ),
-    ssh_key: Optional[str] = typer.Option(None, help="Set the SSH key path"),
-    verbose: Optional[bool] = typer.Option(None, help="Set verbose mode"),
-    log_file: Optional[str] = typer.Option(None, help="Set the log file path"),
-    default_daily_backup: Optional[bool] = typer.Option(
+    hostname: str | None = typer.Option(None, help="Set the hostname"),
+    remote_address: str | None = typer.Option(None, help="Set the remote address"),
+    remote_path: str | None = typer.Option(None, help="Set the remote path"),
+    remote_port: int | None = typer.Option(None, help="Set the remote port"),
+    retention_period: int | None = typer.Option(None, help="Set the retention period in days"),
+    add_source_dir: str | None = typer.Option(None, help="Add a source directory"),
+    remove_source_dir: str | None = typer.Option(None, help="Remove a source directory"),
+    add_exclusion: str | None = typer.Option(None, help="Add an exclusion pattern"),
+    remove_exclusion: str | None = typer.Option(None, help="Remove an exclusion pattern"),
+    ssh_key: str | None = typer.Option(None, help="Set the SSH key path"),
+    verbose: bool | None = typer.Option(None, help="Set verbose mode"),
+    log_file: str | None = typer.Option(None, help="Set the log file path"),
+    default_daily_backup: bool | None = typer.Option(
         None,
         "--default-daily-backup/--no-default-daily-backup",
         help="Enable or disable daily backups as the default behavior",

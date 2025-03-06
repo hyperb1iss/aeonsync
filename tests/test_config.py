@@ -91,6 +91,4 @@ def test_overwrite_protection(config_manager):
     config_manager.set("test_key", "test_value")
     sleep(0.01)
     new_mtime = config_manager.config_file_path.stat().st_mtime
-    assert (
-        new_mtime > original_mtime
-    ), f"New mtime {new_mtime} should be greater than original mtime {original_mtime}"
+    assert new_mtime > original_mtime, f"New mtime {new_mtime} should be greater than original mtime {original_mtime}"

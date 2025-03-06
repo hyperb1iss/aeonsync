@@ -10,15 +10,9 @@ from aeonsync.utils import RemoteExecutor, RemoteInfo, get_backup_stats, parse_r
 
 def test_parse_remote():
     """Test the parse_remote function."""
-    assert parse_remote("user@host:/path") == RemoteInfo(
-        user="user", host="host", path="/path", port=None
-    )
-    assert parse_remote("host:/path") == RemoteInfo(
-        user=None, host="host", path="/path", port=None
-    )
-    assert parse_remote("user@host:/path", 2222) == RemoteInfo(
-        user="user", host="host", path="/path", port=2222
-    )
+    assert parse_remote("user@host:/path") == RemoteInfo(user="user", host="host", path="/path", port=None)
+    assert parse_remote("host:/path") == RemoteInfo(user=None, host="host", path="/path", port=None)
+    assert parse_remote("user@host:/path", 2222) == RemoteInfo(user="user", host="host", path="/path", port=2222)
     with pytest.raises(ValueError):
         parse_remote("invalid_format")
 
@@ -39,9 +33,7 @@ def test_remote_executor_run_command():
         expected_cmd = ["ssh", "-i", "/path/to/key", "-p", "22", "user@host", "ls -l"]
 
         # Assert that the constructed command matches the expected command
-        assert (
-            args[0] == expected_cmd
-        ), f"Expected command {expected_cmd}, but got {args[0]}"
+        assert args[0] == expected_cmd, f"Expected command {expected_cmd}, but got {args[0]}"
 
 
 def test_remote_executor_rsync():
@@ -50,9 +42,7 @@ def test_remote_executor_rsync():
     executor = RemoteExecutor(remote_info, ssh_key="/path/to/key")
 
     with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="rsync output", stderr=""
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="rsync output", stderr="")
         result = executor.rsync("source", "destination", ["--delete"])
 
         mock_run.assert_called_once()

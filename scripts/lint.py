@@ -8,7 +8,6 @@ import sys
 
 def run_lint():
     """Run linting checks on the project using ruff, pylint, and mypy."""
-    print("Running linting checks...")
 
     # Run Ruff (primary linter)
     ruff_result = subprocess.run(
@@ -31,28 +30,24 @@ def run_lint():
 
     # Report results
     if ruff_result.returncode != 0:
-        print("Ruff issues found:")
-        print(ruff_result.stdout)
+        pass
     else:
-        print("Ruff checks passed.")
+        pass
 
     if pylint_result.returncode != 0:
-        print("Pylint issues found:")
-        print(pylint_result.stdout)
+        pass
     else:
-        print("Pylint checks passed.")
+        pass
 
     if mypy_result.returncode != 0:
-        print("Mypy issues found:")
-        print(mypy_result.stdout)
+        pass
     else:
-        print("Mypy checks passed.")
+        pass
 
     # Exit with error if any checks failed
     if ruff_result.returncode != 0 or pylint_result.returncode != 0 or mypy_result.returncode != 0:
         sys.exit(1)
 
-    print("All linting checks passed! ✨")
     sys.exit(0)
 
 

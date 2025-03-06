@@ -1,9 +1,9 @@
 """Utility functions and classes for AeonSync."""
 
+import logging
 import re
 import subprocess
-import logging
-from typing import Dict, List, Optional, NamedTuple
+from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
 
@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 class RemoteInfo(NamedTuple):
     """Information about the remote connection."""
 
-    user: Optional[str]
+    user: str | None
     host: str
     path: str
-    port: Optional[int]
+    port: int | None
 
 
-def parse_remote(remote: str, port: Optional[int] = None) -> RemoteInfo:
+def parse_remote(remote: str, port: int | None = None) -> RemoteInfo:
     """
     Parse the remote string into its components.
 
@@ -37,9 +37,7 @@ def parse_remote(remote: str, port: Optional[int] = None) -> RemoteInfo:
         logger.error("Invalid remote format: %s", remote)
         raise ValueError("Invalid remote format. Use [user@]host:path")
     parts = match.groupdict()
-    return RemoteInfo(
-        user=parts["user"], host=parts["host"], path=parts["path"], port=port
-    )
+    return RemoteInfo(user=parts["user"], host=parts["host"], path=parts["path"], port=port)
 
 
 class RemoteExecutor:
@@ -48,8 +46,8 @@ class RemoteExecutor:
     def __init__(
         self,
         remote_info: RemoteInfo,
-        ssh_key: Optional[str] = None,
-        remote_port: Optional[int] = None,
+        ssh_key: str | None = None,
+        remote_port: int | None = None,
     ):
         """
         Initialize RemoteExecutor with remote connection details.
@@ -77,15 +75,12 @@ class RemoteExecutor:
             subprocess.CalledProcessError: If the command execution fails
         """
         ssh_cmd = self._build_ssh_cmd()
-        full_cmd = ssh_cmd + [
-            f"{self.remote_info.user}@{self.remote_info.host}",
-            command,
-        ]
+        full_cmd = [*ssh_cmd, f"{self.remote_info.user}@{self.remote_info.host}", command]
         logger.debug("Running command: %s", " ".join(full_cmd))
         return subprocess.run(full_cmd, capture_output=True, text=True, check=True)
 
     def rsync(
-        self, source: str, destination: str, extra_args: Optional[List[str]] = None
+        self, source: str, destination: str, extra_args: list[str] | None = None
     ) -> subprocess.CompletedProcess:
         """
         Run rsync command to sync files between local and remote.
@@ -113,7 +108,7 @@ class RemoteExecutor:
         logger.debug("Running rsync command: %s", " ".join(rsync_cmd))
         return subprocess.run(rsync_cmd, capture_output=True, text=True, check=True)
 
-    def _build_ssh_cmd(self) -> List[str]:
+    def _build_ssh_cmd(self) -> list[str]:
         """
         Build the SSH command with optional key and port.
 
@@ -142,7 +137,7 @@ class RemoteExecutor:
         return " ".join(opts)
 
 
-def get_backup_stats(output: str) -> Dict[str, str]:
+def get_backup_stats(output: str) -> dict[str, str]:
     """
     Extract relevant statistics from rsync output.
 

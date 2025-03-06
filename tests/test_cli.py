@@ -68,16 +68,12 @@ def test_sync_command_with_daily_flag(mock_aeon_backup):
 
 @patch("aeonsync.cli.Path.exists")
 @patch("aeonsync.cli.Path.is_dir")
-def test_sync_command_with_options(
-    mock_is_dir, mock_exists, mock_aeon_backup, mock_config_manager
-):
+def test_sync_command_with_options(mock_is_dir, mock_exists, mock_aeon_backup, mock_config_manager):
     """Test the sync command with various options."""
     mock_exists.return_value = True
     mock_is_dir.return_value = True
     mock_config_manager.get.return_value = False  # default_daily_backup = False
-    result = runner.invoke(
-        app, ["sync", "--source", "/test/path", "--retention", "30", "--dry-run"]
-    )
+    result = runner.invoke(app, ["sync", "--source", "/test/path", "--retention", "30", "--dry-run"])
     assert result.exit_code == 0, f"Command failed with output: {result.output}"
     mock_aeon_backup.assert_called_once()
     args, _ = mock_aeon_backup.call_args
@@ -93,9 +89,7 @@ def test_sync_command_with_options(
 
 def test_sync_command_with_default_daily_backup(mock_aeon_backup, mock_config_manager):
     """Test the sync command when default_daily_backup is set in config."""
-    mock_config_manager.get.side_effect = (
-        lambda key, default: True if key == "default_daily_backup" else default
-    )
+    mock_config_manager.get.side_effect = lambda key, default: True if key == "default_daily_backup" else default
     result = runner.invoke(app, ["sync"])
     assert result.exit_code == 0
     mock_aeon_backup.assert_called_once()
@@ -120,9 +114,7 @@ def test_restore_command_interactive(mock_aeon_restore):
     result = runner.invoke(app, ["restore", "--interactive"])
     assert result.exit_code == 0
     mock_aeon_restore.assert_called_once()
-    mock_aeon_restore.return_value.restore_interactive.assert_called_once_with(
-        diff=False, preview=False
-    )
+    mock_aeon_restore.return_value.restore_interactive.assert_called_once_with(diff=False, preview=False)
 
 
 def test_list_backups_command(mock_list_backups, mock_config_manager):
@@ -168,18 +160,14 @@ def test_config_command_add_source_dir(mock_config_manager):
     """Test adding a source directory to the configuration."""
     result = runner.invoke(app, ["config", "--add-source-dir", "/new/source"])
     assert result.exit_code == 0
-    mock_config_manager.add_to_list.assert_called_once_with(
-        "source_dirs", "/new/source"
-    )
+    mock_config_manager.add_to_list.assert_called_once_with("source_dirs", "/new/source")
 
 
 def test_config_command_remove_source_dir(mock_config_manager):
     """Test removing a source directory from the configuration."""
     result = runner.invoke(app, ["config", "--remove-source-dir", "/old/source"])
     assert result.exit_code == 0
-    mock_config_manager.remove_from_list.assert_called_once_with(
-        "source_dirs", "/old/source"
-    )
+    mock_config_manager.remove_from_list.assert_called_once_with("source_dirs", "/old/source")
 
 
 def test_config_command_multiple_changes(mock_config_manager):

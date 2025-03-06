@@ -2,8 +2,8 @@
 
 """Test cases for AeonBackup functionality."""
 
-import subprocess
 from datetime import datetime
+import subprocess
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -36,9 +36,7 @@ def test_aeon_backup_create_backup(aeon_backup):
     at least twice for necessary backup operations like mkdir and rsync.
     """
     aeon_backup.create_backup()
-    assert (
-        aeon_backup.executor.run_command.call_count >= 2
-    ), "create_backup should call run_command at least twice."
+    assert aeon_backup.executor.run_command.call_count >= 2, "create_backup should call run_command at least twice."
 
 
 def test_aeon_backup_needs_full_backup(aeon_backup):
@@ -55,22 +53,18 @@ def test_aeon_backup_needs_full_backup(aeon_backup):
     ]
 
     # First call should indicate that a full backup is needed
-    assert (
-        aeon_backup.needs_full_backup() is True
-    ), "needs_full_backup should return True when subprocess.run fails."
+    assert aeon_backup.needs_full_backup() is True, "needs_full_backup should return True when subprocess.run fails."
 
     # Second call should indicate that a full backup is not needed
-    assert (
-        aeon_backup.needs_full_backup() is False
-    ), "needs_full_backup should return False when subprocess.run succeeds."
+    assert aeon_backup.needs_full_backup() is False, (
+        "needs_full_backup should return False when subprocess.run succeeds."
+    )
 
 
 def test_get_next_backup_name_no_existing_backups(aeon_backup):
     """Test _get_next_backup_name when no existing backups are present."""
     aeon_backup.config = aeon_backup.config._replace(daily=False)
-    aeon_backup.executor.run_command.side_effect = subprocess.CalledProcessError(
-        returncode=1, cmd="ls"
-    )
+    aeon_backup.executor.run_command.side_effect = subprocess.CalledProcessError(returncode=1, cmd="ls")
     backup_name = aeon_backup._get_next_backup_name()
     assert backup_name == aeon_backup.date
 
@@ -101,8 +95,6 @@ def test_aeon_backup_with_sequence_number(sample_config, mock_executor):
     with patch("aeonsync.backup.datetime") as mock_datetime:
         mock_datetime.now.return_value = datetime(2024, 9, 14)
         backup = AeonBackup(config, executor=mock_executor)
-    mock_executor.run_command.return_value.stdout = (
-        "2024-09-14\n2024-09-14.1\n2024-09-14.2\n"
-    )
+    mock_executor.run_command.return_value.stdout = "2024-09-14\n2024-09-14.1\n2024-09-14.2\n"
     backup_name = backup._get_next_backup_name()
     assert backup_name == "2024-09-14.3"
