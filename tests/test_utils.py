@@ -1,4 +1,3 @@
-# pylint: disable=protected-access
 """Tests for utility functions and classes in utils.py."""
 
 from unittest.mock import MagicMock, patch

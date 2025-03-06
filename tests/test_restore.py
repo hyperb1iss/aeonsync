@@ -1,4 +1,4 @@
-# pylint: disable=protected-access, redefined-outer-name, too-many-arguments, unused-argument
+# pylint: disable=redefined-outer-name, unused-argument
 """Test cases for AeonRestore functionality."""
 
 from pathlib import Path

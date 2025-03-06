@@ -2,6 +2,7 @@
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from rich.console import Console
 from rich.table import Table
@@ -35,7 +36,7 @@ port_option = typer.Option(None, help="Remote SSH port")
 verbose_option = typer.Option(False, "--verbose", "-v", help="Enable verbose output")
 
 
-def validate_sources(sources: list[Path]):
+def validate_sources(sources: list[Path]) -> None:
     """Ensure all source directories exist."""
     for source in sources:
         if not source.exists() or not source.is_dir():
@@ -76,7 +77,7 @@ def callback(
     port: int | None = port_option,
     verbose: bool = verbose_option,
     log_file: str | None = typer.Option(None, help="Set the log file path"),
-):
+) -> None:
     """Common options for all commands."""
     ctx.ensure_object(dict)
     ctx.obj["remote"] = remote
@@ -109,7 +110,7 @@ def sync(
         "--daily",
         help="Only create one backup per day (old behavior)",
     ),
-):
+) -> None:
     """Create a backup of specified sources to the remote destination."""
     try:
         validate_sources(sources)
@@ -121,19 +122,17 @@ def sync(
     except typer.BadParameter as e:
         logger.exception("Invalid parameter: %s", str(e))
         console.print(f"[bold red]Error:[/bold red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
-        logger.error("Backup failed: %s", str(e), exc_info=True)
+        logger.exception("Backup failed: %s", str(e))
         console.print(f"[bold red]Error:[/bold red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
 def restore(
     ctx: typer.Context,
-    file: Path | None = typer.Argument(
-        None, help="File or directory to restore (current directory if not specified)"
-    ),
+    file: Path | None = typer.Argument(None, help="File or directory to restore (current directory if not specified)"),
     date: str | None = typer.Argument(None, help="Backup date to restore from"),
     output_dir: Path | None = typer.Option(
         None, "--output", "-o", help="Output directory for restored file or directory"
@@ -141,7 +140,7 @@ def restore(
     interactive: bool = typer.Option(False, "--interactive", "-i", help="Use fully interactive mode for restore"),
     diff: bool = typer.Option(False, "--diff", help="Show diff between local and backup versions"),
     preview: bool = typer.Option(False, "--preview", help="Show a preview of the file before restoring"),
-):
+) -> None:
     """Restore a specific file or directory from a backup."""
     try:
         sources = config_manager.get("source_dirs", DEFAULT_SOURCE_DIRS)
@@ -162,13 +161,13 @@ def restore(
             restore_obj.restore_file_versions(str(file), date, output_dir, diff=diff, preview=preview)
 
     except Exception as e:
-        logger.error("File restoration failed: %s", str(e), exc_info=True)
+        logger.exception("File restoration failed: %s", str(e))
         console.print(f"[bold red]Error:[/bold red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 @app.command()
-def list_backups(ctx: typer.Context):
+def list_backups(ctx: typer.Context) -> None:
     """List all available backups with their metadata."""
     try:
         remote = ctx.obj.get("remote")
@@ -190,14 +189,14 @@ def list_backups(ctx: typer.Context):
     except typer.BadParameter as e:
         logger.exception("Invalid parameter: %s", str(e))
         console.print(f"[bold red]Error:[/bold red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Exception as e:
-        logger.error("Failed to list backups: %s", str(e), exc_info=True)
+        logger.exception("Failed to list backups: %s", str(e))
         console.print(f"[bold red]Error:[/bold red] {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-arguments
 @app.command()
 def config(
     hostname: str | None = typer.Option(None, help="Set the hostname"),
@@ -218,7 +217,7 @@ def config(
         help="Enable or disable daily backups as the default behavior",
     ),
     show: bool = typer.Option(False, "--show", help="Show current configuration"),
-):
+) -> None:
     """View or edit the AeonSync configuration."""
     if show:
         show_config(config_manager.config)
@@ -273,7 +272,7 @@ def config(
     show_config(config_manager.config)
 
 
-def show_config(config_dict: dict):
+def show_config(config_dict: dict[str, Any]) -> None:
     """Display the current configuration."""
     table = Table(title="AeonSync Configuration")
     table.add_column("Setting", style="cyan")

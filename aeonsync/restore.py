@@ -276,7 +276,7 @@ class AeonRestore(BaseCommand):
         logger.debug("Found %d backups", len(backups))
         return sorted(
             backups,
-            key=lambda x: datetime.strptime(x["date"], "%Y-%m-%d"),
+            key=lambda x: datetime.strptime(x["date"], "%Y-%m-%d").replace(tzinfo=UTC),
             reverse=True,
         )
 
@@ -651,26 +651,19 @@ class AeonRestore(BaseCommand):
 
     def _log_restore_operation(self, backup_date: str, remote_relative_path: str, restore_path: str) -> None:
         """
-        Log the restore operation for auditing purposes.
-
-        Args:
-            backup_date (str): Backup date
-            remote_relative_path (str): Relative path of the file in the backup
-            restore_path (str): Path where the file was restored
+        Log a restore operation to the log file.
         """
-        logger.debug(
-            "Logging restore operation: date=%s, remote_path=%s, restore_path=%s",
-            backup_date,
+        logger.info(
+            "Restoring %s from %s to %s",
             remote_relative_path,
+            backup_date,
             restore_path,
         )
         log_entry = (
-            f"{datetime.now().isoformat()} - Restored: {remote_relative_path} "
+            f"{datetime.now(tz=UTC).isoformat()} - Restored: {remote_relative_path} "
             + f"from {backup_date} to {restore_path}"
         )
         log_file = self.config.log_file or "aeon_restore.log"
 
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(log_entry + "\n")
-
-        logger.info("Restore operation logged to %s", log_file)

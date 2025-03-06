@@ -217,6 +217,13 @@ section-order = [
 # Ignore unused imports in __init__ files
 "__init__.py" = ["F401", "E402"]
 
+# Typer-specific ignores
+"aeonsync/cli.py" = ["B008"]  # Typer requires function calls in argument defaults
+
+# Core functionality using subprocess
+"aeonsync/utils.py" = ["S603"]  # SSH and rsync commands are core functionality
+"aeonsync/restore.py" = ["S603"]  # Diff command is safe with file paths
+
 # More relaxed rules for tests
 "tests/**/*.py" = [
     "ARG001",  # Unused function arguments (common for fixtures)
@@ -226,12 +233,21 @@ section-order = [
     "PIE790",  # Allow unnecessary 'pass' statements in mocks
     "PLR2004", # Allow magic numbers in tests
     "PT018",   # Allow complex assertions (common in tests to check multiple conditions)
+    "PT019",   # Allow unused fixtures (they may be used implicitly)
     "RET504",  # Allow unnecessary assignment before return (clearer in tests)
     "S101",    # Allow asserts in tests
     "S105",    # Allow hardcoded passwords in variable assignments (it's just test data!)
     "S106",    # Allow hardcoded passwords as arguments (it's just test data!)
+    "S108",    # Allow temp file usage in tests
     "SLF001",  # Allow private member access in tests
     "BLE001",  # Allow catching blind exceptions in tests
+    "DTZ001",  # Allow naive datetime in tests
+]
+
+# Script-specific ignores
+"scripts/**/*.py" = [
+    "S603",    # Subprocess calls - these are trusted in our scripts
+    "S607",    # Partial exec paths - we control the environment
 ]
 
 # Format settings for consistency

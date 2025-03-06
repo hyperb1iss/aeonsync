@@ -1,4 +1,4 @@
-# pylint: disable=protected-access, redefined-outer-name
+# pylint: disable=redefined-outer-name
 
 """Test cases for AeonBackup functionality."""
 

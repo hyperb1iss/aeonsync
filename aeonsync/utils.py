@@ -3,6 +3,7 @@
 import logging
 import re
 import subprocess
+from subprocess import CompletedProcess
 from typing import NamedTuple
 
 logger = logging.getLogger(__name__)
@@ -61,29 +62,24 @@ class RemoteExecutor:
         self.ssh_key = ssh_key
         self.remote_port = remote_port or remote_info.port
 
-    def run_command(self, command: str) -> subprocess.CompletedProcess:
+    def run_command(self, command: str) -> CompletedProcess[str]:
         """
-        Run a command on the remote host using SSH.
+        Run a command on the remote server.
 
         Args:
-            command (str): Command to execute on the remote host
+            command (str): Command to run
 
         Returns:
-            subprocess.CompletedProcess: Result of the command execution
-
-        Raises:
-            subprocess.CalledProcessError: If the command execution fails
+            CompletedProcess: Process result
         """
         ssh_cmd = self._build_ssh_cmd()
         full_cmd = [*ssh_cmd, f"{self.remote_info.user}@{self.remote_info.host}", command]
         logger.debug("Running command: %s", " ".join(full_cmd))
         return subprocess.run(full_cmd, capture_output=True, text=True, check=True)
 
-    def rsync(
-        self, source: str, destination: str, extra_args: list[str] | None = None
-    ) -> subprocess.CompletedProcess:
+    def rsync(self, source: str, destination: str, extra_args: list[str] | None = None) -> CompletedProcess[str]:
         """
-        Run rsync command to sync files between local and remote.
+        Run rsync to copy files between local and remote.
 
         Args:
             source (str): Source path (local or remote)
@@ -91,7 +87,7 @@ class RemoteExecutor:
             extra_args (Optional[List[str]]): Additional rsync arguments
 
         Returns:
-            subprocess.CompletedProcess: Result of the rsync execution
+            CompletedProcess: Result of the rsync execution
 
         Raises:
             subprocess.CalledProcessError: If the rsync execution fails

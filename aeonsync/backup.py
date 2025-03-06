@@ -1,6 +1,6 @@
 """Backup functionality for AeonSync."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 import json
 import logging
 from pathlib import Path, PosixPath
@@ -25,7 +25,7 @@ class AeonBackup(BaseCommand):
             config (BackupConfig): Backup configuration
         """
         super().__init__(config)
-        self.date = datetime.now().strftime("%Y-%m-%d")
+        self.date = datetime.now(tz=UTC).strftime("%Y-%m-%d")
         self.executor = executor or RemoteExecutor(
             self.remote_info,
             self.config.ssh_key,
@@ -71,7 +71,7 @@ class AeonBackup(BaseCommand):
             for key, value in stats.items():
                 logger.info("%s: %s", key.replace("_", " ").title(), value)
 
-            return result.stdout
+            return str(result.stdout)
         except subprocess.CalledProcessError as e:
             logger.exception("Rsync command failed: %s", e.stderr)
             raise
@@ -97,9 +97,9 @@ class AeonBackup(BaseCommand):
     def _save_backup_metadata(self, rsync_output: str) -> None:
         """Save the backup metadata to a file in the backup directory."""
         logger.debug("Saving backup metadata")
-        start_time = datetime.now()
+        start_time = datetime.now(tz=UTC)
         stats = get_backup_stats(rsync_output)
-        end_time = datetime.now()
+        end_time = datetime.now(tz=UTC)
         duration = end_time - start_time
         metadata = {
             "start_time": start_time.isoformat(),

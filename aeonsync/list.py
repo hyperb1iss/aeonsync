@@ -4,12 +4,13 @@ import builtins
 import json
 import logging
 import re
+from typing import Any
 
 from rich.console import Console
 from rich.table import Table
 
 from aeonsync import BaseCommand
-from aeonsync.config import HOSTNAME, METADATA_FILE_NAME, BackupConfig
+from aeonsync.config import HOSTNAME, METADATA_FILE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -17,22 +18,18 @@ logger = logging.getLogger(__name__)
 class ListBackups(BaseCommand):
     """Handles listing of backups for AeonSync."""
 
-    def __init__(self, config: BackupConfig):
-        """
-        Initialize ListBackups with backup configuration.
-
-        Args:
-            config (BackupConfig): Backup configuration
-        """
-        super().__init__(config)
-
     def list(self) -> None:
         """List all available backups with their metadata."""
         backups = self._fetch_backup_list()
         self._display_backup_list(backups)
 
-    def _fetch_backup_list(self) -> builtins.list[dict]:
-        """Fetch the list of backups from the remote server."""
+    def _fetch_backup_list(self) -> builtins.list[dict[str, Any]]:
+        """
+        Fetch the list of available backups from the remote server.
+
+        Returns:
+            list[dict[str, Any]]: List of backup dictionaries with date info
+        """
         cmd = (
             f"for d in {self.remote_info.path}/{HOSTNAME}/20*-*-*{{'',.*}}; do "
             f'echo "BACKUP_START $(basename $d)"; '
@@ -44,8 +41,16 @@ class ListBackups(BaseCommand):
         return self._parse_backup_list(result.stdout)
 
     @staticmethod
-    def _parse_backup_list(output: str) -> builtins.list[dict]:
-        """Parse the JSON output from the backup list command."""
+    def _parse_backup_list(output: str) -> builtins.list[dict[str, Any]]:
+        """
+        Parse the output of the backup list command.
+
+        Args:
+            output (str): Command output
+
+        Returns:
+            list[dict[str, Any]]: List of backup dictionaries
+        """
         backups = []
         current_backup = None
         current_json = ""
@@ -69,8 +74,13 @@ class ListBackups(BaseCommand):
 
         return backups
 
-    def _display_backup_list(self, backups: builtins.list[dict]) -> None:
-        """Display the backup list with metadata in an informative format."""
+    def _display_backup_list(self, backups: builtins.list[dict[str, Any]]) -> None:
+        """
+        Display the list of backups in a table.
+
+        Args:
+            backups (list[dict[str, Any]]): List of backup dictionaries
+        """
         console = Console()
 
         if not backups:
@@ -93,8 +103,14 @@ class ListBackups(BaseCommand):
         console.print(table)
         self._print_backup_summary(sorted_backups, console)
 
-    def _add_backup_to_table(self, backup: dict, table: Table) -> None:
-        """Add a single backup entry to the display table."""
+    def _add_backup_to_table(self, backup: dict[str, Any], table: Table) -> None:
+        """
+        Add a backup to the table.
+
+        Args:
+            backup (dict[str, Any]): Backup information
+            table (Table): Table to add the backup to
+        """
         if "error" in backup:
             table.add_row(
                 backup.get("date", "Unknown"),
@@ -106,7 +122,7 @@ class ListBackups(BaseCommand):
             )
         else:
             try:
-                stats = backup.get("stats", {})
+                stats: dict[str, Any] = backup.get("stats", {})
                 hostname = backup.get("hostname", "Unknown")
                 sources = ", ".join(backup.get("sources", []))
                 total_size = self._get_total_size(backup)
@@ -131,8 +147,14 @@ class ListBackups(BaseCommand):
                     "N/A",
                 )
 
-    def _print_backup_summary(self, backups: builtins.list[dict], console: Console) -> None:
-        """Print a summary of the backup list."""
+    def _print_backup_summary(self, backups: builtins.list[dict[str, Any]], console: Console) -> None:
+        """
+        Print a summary of the backups.
+
+        Args:
+            backups (list[dict[str, Any]]): List of backup dictionaries
+            console (Console): Rich console instance
+        """
         total_backups = len(backups)
         valid_backups = [b for b in backups if "error" not in b]
         latest_backup = valid_backups[0] if valid_backups else None
@@ -159,9 +181,17 @@ class ListBackups(BaseCommand):
         return file_count
 
     @staticmethod
-    def _get_total_size(backup: dict) -> int:
-        """Get the total file size from the backup stats."""
-        stats = backup.get("stats", {})
+    def _get_total_size(backup: dict[str, Any]) -> int:
+        """
+        Get the total size in bytes from the backup.
+
+        Args:
+            backup (dict[str, Any]): Backup information
+
+        Returns:
+            int: Total size in bytes
+        """
+        stats: dict[str, Any] = backup.get("stats", {})
         size_str = stats.get("total_file_size", "0 bytes")
         match = re.search(r"(\d+(?:,\d+)*)", size_str)
         if match:
@@ -169,8 +199,16 @@ class ListBackups(BaseCommand):
         return 0
 
     @staticmethod
-    def _get_changed_size(stats: dict) -> int | None:
-        """Get the changed size from the backup stats using literal_data."""
+    def _get_changed_size(stats: dict[str, Any]) -> int | None:
+        """
+        Get the changed size in bytes from the stats.
+
+        Args:
+            stats (dict[str, Any]): Backup statistics
+
+        Returns:
+            int | None: Changed size in bytes or None if not available
+        """
         literal_data = stats.get("literal_data", "0 bytes")
         match = re.search(r"(\d+(?:,\d+)*)", literal_data)
         if match:
