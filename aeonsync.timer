@@ -1,0 +1,13 @@
+[Unit]
+Description=AeonSync Backup Timer
+Requires=aeonsync.service
+
+[Timer]
+OnCalendar=daily
+# Uncomment for more frequent backups:
+#OnUnitActiveSec=6h
+Persistent=true
+RandomizedDelaySec=1800
+
+[Install]
+WantedBy=timers.target 

@@ -1,0 +1,15 @@
+[Unit]
+Description=AeonSync Backup Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aeon sync
+# Uncomment and modify these lines if needed:
+#Environment=AEONSYNC_CONFIG=/path/to/config
+#User=your_username
+#Group=your_group
+
+[Install]
+WantedBy=multi-user.target 
